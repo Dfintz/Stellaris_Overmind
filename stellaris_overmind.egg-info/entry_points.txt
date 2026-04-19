@@ -1,0 +1,2 @@
+[console_scripts]
+overmind = engine.main:main

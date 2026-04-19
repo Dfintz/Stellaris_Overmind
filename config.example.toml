@@ -1,0 +1,62 @@
+# Stellaris Overmind - Configuration
+# Copy to config.toml and edit for your setup.
+
+log_level = "INFO"
+max_retries = 2
+
+[stellaris]
+# Stellaris installation directory (Steam)
+install_dir = "G:/SteamLibrary/steamapps/common/Stellaris"
+
+# Stellaris user data directory (where mods, saves, and logs live)
+# Windows: typically Documents/Paradox Interactive/Stellaris
+# If using OneDrive: ~/OneDrive/Documents/Paradox Interactive/Stellaris
+user_data_dir = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris"
+
+# Mod name (folder inside user_data_dir/mod/)
+mod_name = "stellaris_overmind"
+
+[llm]
+# Provider options: "qwen-vllm" | "openai-compat" | "ollama" | "stub"
+provider = "qwen-vllm"
+
+# vLLM endpoint (default Docker compose exposes on 8000)
+base_url = "http://localhost:8000"
+
+# Model ID as registered in vLLM
+# For 7B (needs ~32GB VRAM): "Qwen/Qwen2.5-Omni-7B"
+# For 3B (needs ~18GB VRAM): "Qwen/Qwen2.5-Omni-3B"
+# For GPTQ-Int4 (~12GB VRAM): "Qwen/Qwen2.5-Omni-7B-GPTQ-Int4"
+model = "Qwen/Qwen2.5-Omni-3B"
+
+max_tokens = 256
+temperature = 0.3
+timeout_s = 30.0
+
+# Only needed for remote API providers
+# api_key = ""
+
+[bridge]
+# Autosave directory — the engine watches this for new .sav files.
+# If this directory exists, the engine uses autosave mode (recommended).
+# No Clausewitz state exporter mod is needed in this mode.
+save_dir = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/save games"
+
+# Player name — auto-detected from the save file if left empty.
+# Set this if auto-detection picks the wrong empire.
+# player_name = ""
+
+# Directive output directory — the Clausewitz mod reads directives from here.
+bridge_dir = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge"
+
+# How often to check for new saves (seconds)
+poll_interval_s = 2.0
+
+[empire]
+# Your empire's setup — must match what you pick in the game launcher.
+# The AI will generate a ruleset from these.
+ethics = ["Fanatic Authoritarian", "Spiritualist"]
+civics = ["Corvée System", "Planet Forgers"]
+traits = ["Ingenious", "Industrious"]
+origin = "Cybernetic Creed"
+government = "Imperial"

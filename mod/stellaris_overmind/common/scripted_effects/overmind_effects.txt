@@ -1,0 +1,120 @@
+# ============================================================
+# Stellaris Overmind — Scripted Effects (Action Executor)
+#
+# Each macro action from the LLM is mapped to a scripted effect
+# that uses Stellaris' built-in AI weights and effects.
+#
+# These are deliberately simple — the LLM decides WHAT to do,
+# Stellaris' micro-AI handles HOW to do it.
+# ============================================================
+
+
+# --- EXPAND: Build outposts, claim systems ---
+overmind_action_expand = {
+	log = "[OVERMIND] Action: EXPAND"
+	# Increase expansion priority via country modifier
+	add_modifier = {
+		modifier = overmind_expansion_focus
+		days = 180
+	}
+}
+
+
+# --- BUILD_FLEET: Queue ship construction ---
+overmind_action_build_fleet = {
+	log = "[OVERMIND] Action: BUILD_FLEET"
+	add_modifier = {
+		modifier = overmind_military_focus
+		days = 180
+	}
+}
+
+
+# --- IMPROVE_ECONOMY: Build districts, buildings ---
+overmind_action_improve_economy = {
+	log = "[OVERMIND] Action: IMPROVE_ECONOMY"
+	add_modifier = {
+		modifier = overmind_economy_focus
+		days = 180
+	}
+}
+
+
+# --- FOCUS_TECH: Prioritize research ---
+overmind_action_focus_tech = {
+	log = "[OVERMIND] Action: FOCUS_TECH"
+	add_modifier = {
+		modifier = overmind_research_focus
+		days = 180
+	}
+}
+
+
+# --- DIPLOMACY: Manage relations ---
+overmind_action_diplomacy = {
+	log = "[OVERMIND] Action: DIPLOMACY"
+	add_modifier = {
+		modifier = overmind_diplomacy_focus
+		days = 180
+	}
+}
+
+
+# --- PREPARE_WAR: Shift to war footing ---
+overmind_action_prepare_war = {
+	log = "[OVERMIND] Action: PREPARE_WAR"
+	add_modifier = {
+		modifier = overmind_war_preparation
+		days = 360
+	}
+}
+
+
+# --- DEFEND: Rally fleets, fortify chokepoints ---
+overmind_action_defend = {
+	log = "[OVERMIND] Action: DEFEND"
+	add_modifier = {
+		modifier = overmind_defense_focus
+		days = 180
+	}
+}
+
+
+# --- CONSOLIDATE: Pause expansion, fix deficits ---
+overmind_action_consolidate = {
+	log = "[OVERMIND] Action: CONSOLIDATE"
+	add_modifier = {
+		modifier = overmind_consolidation
+		days = 180
+	}
+}
+
+
+# --- COLONIZE: Send colony ships ---
+overmind_action_colonize = {
+	log = "[OVERMIND] Action: COLONIZE"
+	add_modifier = {
+		modifier = overmind_colonize_focus
+		days = 180
+	}
+}
+
+
+# --- BUILD_STARBASE: Upgrade/construct starbases ---
+overmind_action_build_starbase = {
+	log = "[OVERMIND] Action: BUILD_STARBASE"
+	add_modifier = {
+		modifier = overmind_starbase_focus
+		days = 180
+	}
+}
+
+
+# --- ESPIONAGE: Build spy networks, run operations ---
+overmind_action_espionage = {
+	log = "[OVERMIND] Action: ESPIONAGE"
+	add_modifier = {
+		modifier = overmind_espionage_focus
+		days = 180
+	}
+}

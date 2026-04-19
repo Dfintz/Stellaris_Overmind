@@ -1,0 +1,77 @@
+# Stellaris Overmind — Docker Compose
+#
+# Runs:
+#   1. Qwen2.5-Omni via vLLM (GPU) — OpenAI-compatible API on :8000
+#   2. Overmind engine (CPU) — watches bridge files, queries LLM
+#
+# Usage:
+#   docker compose up -d           # start both services
+#   docker compose up qwen         # start just the LLM server
+#   docker compose logs -f qwen    # watch LLM logs
+#   docker compose down            # stop everything
+#
+# Prerequisites:
+#   - NVIDIA GPU with ≥18GB VRAM (3B) or ≥32GB (7B)
+#   - nvidia-container-toolkit installed
+#   - Model downloaded to ./models/ or specify HF model ID
+
+services:
+  # ------------------------------------------------------------------ #
+  # Qwen2.5-Omni served via vLLM (OpenAI-compat API)
+  # ------------------------------------------------------------------ #
+  qwen:
+    image: qwenllm/qwen-omni:2.5-cu121
+    container_name: overmind-qwen
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount local model cache to avoid re-downloading
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    command: >
+      vllm serve ${QWEN_MODEL:-Qwen/Qwen2.5-Omni-3B}
+      --port 8000
+      --host 0.0.0.0
+      --dtype bfloat16
+      --max-model-len 4096
+      --enforce-eager
+      --thinker-only
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s  # model loading takes time
+
+  # ------------------------------------------------------------------ #
+  # Overmind AI Engine
+  # ------------------------------------------------------------------ #
+  overmind:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: overmind-engine
+    restart: unless-stopped
+    depends_on:
+      qwen:
+        condition: service_healthy
+    volumes:
+      # Bridge directory — must point to the Stellaris mod's ai_bridge folder
+      # Default: your Stellaris mod dir (OneDrive/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge)
+      - ${BRIDGE_DIR:-C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge}:/app/mod/ai_bridge
+      # Config
+      - ./config.toml:/app/config.toml:ro
+    environment:
+      - OVERMIND_LLM_URL=http://qwen:8000
+      - OVERMIND_LLM_PROVIDER=qwen-vllm
+      - OVERMIND_LOG_LEVEL=INFO
+    command: python -m engine.main

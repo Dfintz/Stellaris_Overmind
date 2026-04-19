@@ -1,0 +1,52 @@
+Metadata-Version: 2.4
+Name: stellaris-overmind
+Version: 0.1.0
+Summary: LLM-driven AI overhaul for Stellaris 4.3.4
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Provides-Extra: training
+Requires-Dist: transformers>=4.52; extra == "training"
+Requires-Dist: peft>=0.13; extra == "training"
+Requires-Dist: trl>=0.12; extra == "training"
+Requires-Dist: datasets>=3.0; extra == "training"
+Requires-Dist: accelerate>=1.0; extra == "training"
+Requires-Dist: bitsandbytes>=0.44; extra == "training"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: ruff>=0.5; extra == "dev"
+Requires-Dist: mypy>=1.10; extra == "dev"
+
+﻿# Stellaris Overmind — LLM‑Driven AI Overhaul for Stellaris 4.3.4
+
+A **non‑cheating, expert‑level Stellaris AI** powered by a local LLM.
+
+The AI plays within Stellaris 4.3.4 rules, respects fog‑of‑war, adapts to
+ethics/civics/traits/origins, and makes macro‑strategic decisions like a
+strong human player — live, without pausing the game.
+
+## Quick Links
+
+- [Project Overview](docs/PROJECT_OVERVIEW.md) — full specification
+- [Ruleset Spec](docs/RULESET_SPEC.md) — how rulesets work
+- [Patch Meta 4.3.4](docs/META_4.3.4.md) — curated strategic meta
+- [Personality System](docs/PERSONALITY_SYSTEM.md) — leader shards & government weighting
+- [Exporter Spec](docs/EXPORTER_SPEC.md) — game state → JSON
+- [Executor Spec](docs/EXECUTOR_SPEC.md) — LLM directives → game actions
+
+## Repository Structure
+
+```
+docs/           Project specs and contributor docs
+engine/         Python AI engine (ruleset generator, decision engine, validator)
+mod/            Clausewitz mod files (game integration)
+examples/       Sample rulesets, events, and decisions
+```
+
+## Status
+
+**Early development** — architecture defined, engine scaffolded, specs written.
+
+## License
+
+TBD

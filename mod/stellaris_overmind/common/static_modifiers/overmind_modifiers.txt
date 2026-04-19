@@ -1,0 +1,69 @@
+# ============================================================
+# Stellaris Overmind — Static Modifiers
+#
+# Country modifiers applied by the action executor to influence
+# Stellaris' built-in AI behavior for the directed macro action.
+#
+# These modifiers are temporary (180 days) and replaced each
+# time a new directive arrives.
+# ============================================================
+
+overmind_expansion_focus = {
+	country_starbase_influence_cost_mult = -0.15
+	country_outpost_influence_cost_mult = -0.15
+}
+
+overmind_military_focus = {
+	country_naval_cap_mult = 0.10
+	ship_speed_mult = 0.05
+	country_ship_upgrade_cost_mult = -0.10
+}
+
+overmind_economy_focus = {
+	planet_jobs_worker_produces_mult = 0.05
+	planet_building_build_speed_mult = 0.15
+}
+
+overmind_research_focus = {
+	all_technology_research_speed = 0.05
+	num_tech_alternatives_add = 1
+}
+
+overmind_diplomacy_focus = {
+	envoys_add = 1
+	diplo_weight_mult = 0.10
+}
+
+overmind_war_preparation = {
+	country_alloys_produces_mult = 0.10
+	ship_fire_rate_mult = 0.05
+	army_damage_mult = 0.10
+}
+
+overmind_defense_focus = {
+	starbase_defense_platform_capacity_add = 2
+	ship_hull_regen_add_perc = 0.05
+	planet_army_build_speed_mult = 0.25
+}
+
+overmind_consolidation = {
+	planet_stability_add = 5
+	planet_amenities_mult = 0.10
+	country_energy_produces_mult = 0.05
+}
+
+overmind_colonize_focus = {
+	planet_colony_development_speed_mult = 0.25
+	pop_growth_speed = 0.05
+}
+
+overmind_starbase_focus = {
+	starbase_upgrade_cost_mult = -0.15
+	starbase_upgrade_speed_mult = 0.25
+}
+
+overmind_espionage_focus = {
+	spy_network_levels_add = 5
+	intel_decryption_add = 1
+	espionage_operation_cost_mult = -0.10
+}

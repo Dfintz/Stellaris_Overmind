@@ -1,0 +1,11 @@
+{
+  "action": "BUILD_FLEET",
+  "target": "Homeworld System",
+  "parameters": {
+    "composition": "balanced",
+    "weapon_loadout": "autocannon_plasma",
+    "budget_alloys": 200
+  },
+  "reason": "Hostile neighbor (Tzynn Empire) detected adjacent to borders. FANATIC AUTHORITARIAN ethic base sets worker_job_efficiency=0.20, enabling strong alloy production. MILITARIST base sets fleet_budget_share=0.40. Current fleet power (3200) is below defensive threshold. META: autocannon+plasma is swarm meta per 4.3 weapon verdicts (~23 days to kill corvette). Disruptors are DEAD. BUILD_FLEET to reach deterrence parity.",
+  "timestamp": "2230.6"
+}

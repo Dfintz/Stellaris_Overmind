@@ -1,0 +1,31 @@
+# Secrets & local config
+.env
+config.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Training data (large files)
+training/replay_buffer/
+training/sft_data/
+training/dpo_pairs/
+models/
+
+# Stellaris bridge files (written at runtime)
+mod/stellaris_overmind/ai_bridge/state_snapshot.json
+mod/stellaris_overmind/ai_bridge/directive.json
+mod/stellaris_overmind/ai_bridge/ack.json
+mod/ai_bridge/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store

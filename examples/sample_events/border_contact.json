@@ -1,0 +1,52 @@
+{
+  "version": "4.3.4",
+  "year": 2230,
+  "month": 6,
+  "empire": {
+    "name": "Cybernetic Creed Empire",
+    "ethics": ["Fanatic Authoritarian", "Spiritualist"],
+    "civics": ["Corvée System", "Planet Forgers"],
+    "origin": "Cybernetic Creed",
+    "government": "Imperial"
+  },
+  "economy": {
+    "energy": 245,
+    "minerals": 380,
+    "food": 120,
+    "alloys": 85,
+    "consumer_goods": 40,
+    "influence": 3.2,
+    "unity": 55
+  },
+  "fleets": [
+    {
+      "name": "1st Fleet",
+      "power": 3200,
+      "location_system": "Homeworld System",
+      "composition": {"corvettes": 10}
+    }
+  ],
+  "known_empires": [
+    {
+      "name": "Tzynn Empire",
+      "attitude": "Hostile",
+      "intel_level": "Low",
+      "known_fleet_power": "Unknown",
+      "border_status": "Adjacent"
+    },
+    {
+      "name": "Iferyx Amalgamated Fleets",
+      "attitude": "Cordial",
+      "intel_level": "Medium",
+      "known_fleet_power": 2800,
+      "border_status": "Nearby"
+    }
+  ],
+  "colonies": ["Homeworld", "Volcanic Colony Alpha"],
+  "available_actions": [
+    "EXPAND", "BUILD_FLEET", "IMPROVE_ECONOMY", "FOCUS_TECH",
+    "DIPLOMACY", "PREPARE_WAR", "DEFEND", "CONSOLIDATE",
+    "COLONIZE", "BUILD_STARBASE"
+  ],
+  "event": "BORDER_CONTACT_NEW_EMPIRE"
+}

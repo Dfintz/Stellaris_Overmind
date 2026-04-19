@@ -1,0 +1,19 @@
+# ============================================================
+# Stellaris Overmind — On Actions
+# Registers mod events on game triggers.
+# Only the directive reader is needed (state comes from autosaves).
+# ============================================================
+
+# Heartbeat — check for new directives every month
+on_monthly_pulse_country = {
+	events = {
+		overmind.100
+	}
+}
+
+# Game start — initialize overmind flags
+on_game_start = {
+	events = {
+		overmind.1
+	}
+}

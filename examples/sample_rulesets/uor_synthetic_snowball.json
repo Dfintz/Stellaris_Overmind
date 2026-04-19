@@ -1,0 +1,50 @@
+{
+  "version": "4.3.4",
+  "empire": {
+    "name": "Under One Rule Snowball",
+    "ethics": ["Xenophobe", "Pacifist", "Materialist"],
+    "civics": ["Byzantine Bureaucracy", "Technocracy"],
+    "origin": "Under One Rule",
+    "government": "Dictatorial"
+  },
+  "ruleset": {
+    "base": {
+      "diplomacy_tendency": "isolationist",
+      "expansion_drive": 0.8,
+      "war_frequency": "low",
+      "tech_focus": 0.8,
+      "research_speed_mult": 0.05,
+      "empire_size_pops_mult": -0.10,
+      "stability_add": 5
+    },
+    "modifiers": {
+      "bureaucrat_unity_add": 1,
+      "bureaucrat_stability_add": 1,
+      "research_priority": "high",
+      "scientist_cap_add": 1,
+      "research_alternatives_add": 1
+    },
+    "micro_modifiers": {
+      "researcher_job_efficiency": 0.10,
+      "bureaucrat_job_efficiency": 0.10,
+      "logistic_growth_mult": 0.10
+    },
+    "overrides": {
+      "ruler_centric": true,
+      "luminary_leader": true,
+      "synth_awareness_bonus": 0.25,
+      "pop_assembly_bonus": 1,
+      "meta_tier": "S",
+      "meta_strategy": "synthetic_ascension_snowball"
+    }
+  },
+  "meta_tier": "S",
+  "meta_strategy": "synthetic_ascension_snowball",
+  "ascension_path": "synthetic",
+  "key_milestones": [
+    "Keep Luminary ruler alive",
+    "Complete Synthetic Ascension",
+    "Gain unique synth trait boosting all economy",
+    "Achieve -100% researcher upkeep with Technocracy + Faith in Science"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "version": "4.3.4",
+  "empire": {
+    "name": "Cybernetic Creed Worker Stack",
+    "ethics": ["Fanatic Authoritarian", "Spiritualist"],
+    "civics": ["Corvée System", "Planet Forgers", "Reanimators"],
+    "origin": "Cybernetic Creed",
+    "government": "Imperial"
+  },
+  "ruleset": {
+    "base": {
+      "economic_style": "alloy_focused",
+      "living_standards": "stratified",
+      "stability_focus": 0.9,
+      "worker_job_efficiency": 0.20,
+      "influence_produces_add": 1.0,
+      "unity_produces_mult": 0.10,
+      "edict_cost_mult": -0.10
+    },
+    "modifiers": {
+      "resettlement_cost": "free",
+      "worker_produces_mult": 0.10,
+      "volcanic_world_start": true,
+      "volcanic_max_districts_add": 3,
+      "soldier_swap": "necromancers",
+      "undead_armies": true
+    },
+    "micro_modifiers": {
+      "technician_job_efficiency": 0.15,
+      "miner_job_efficiency": 0.15
+    },
+    "overrides": {
+      "ascension_lock": "cybernetic",
+      "worker_stacking": true,
+      "toil_faction": true,
+      "creed_worker_buff": 0.40,
+      "imperial_creed_bonus": 0.10,
+      "labored_masses_edict": 0.20,
+      "meta_tier": "S",
+      "meta_strategy": "worker_stacking"
+    }
+  },
+  "meta_tier": "S",
+  "meta_strategy": "worker_stacking",
+  "worker_efficiency_total": "+87-95%",
+  "worker_efficiency_breakdown": {
+    "cybernetic_creed_toil_faction": "+40%",
+    "fanatic_authoritarian": "+20% (job efficiency)",
+    "imperial_creed_bonus": "+10%",
+    "labored_masses_edict": "+20%",
+    "corvee_system": "+10%",
+    "domination_traditions": "+10%"
+  }
+}
