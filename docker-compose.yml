@@ -10,6 +10,12 @@
 #   docker compose logs -f qwen    # watch LLM logs
 #   docker compose down            # stop everything
 #
+# Speculative decoding (faster generation):
+#   docker compose --profile speculative up -d
+#
+# TensorRT-LLM (maximum speed):
+#   docker compose --profile tensorrt up -d
+#
 # Prerequisites:
 #   - NVIDIA GPU with ≥18GB VRAM (3B) or ≥32GB (7B)
 #   - nvidia-container-toolkit installed
@@ -75,3 +81,80 @@ services:
       - OVERMIND_LLM_PROVIDER=qwen-vllm
       - OVERMIND_LOG_LEVEL=INFO
     command: python -m engine.main
+
+  # ------------------------------------------------------------------ #
+  # vLLM with Speculative Decoding (faster generation)
+  # Activate: docker compose --profile speculative up -d
+  # Uses a small draft model to propose tokens verified by the main model
+  # ------------------------------------------------------------------ #
+  qwen-speculative:
+    image: qwenllm/qwen-omni:2.5-cu121
+    container_name: overmind-qwen-speculative
+    profiles: ["speculative"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    command: >
+      vllm serve ${QWEN_MODEL:-Qwen/Qwen2.5-Omni-7B}
+      --port 8000
+      --host 0.0.0.0
+      --dtype bfloat16
+      --max-model-len 4096
+      --enforce-eager
+      --thinker-only
+      --speculative-model ${DRAFT_MODEL:-Qwen/Qwen2.5-Omni-0.5B}
+      --num-speculative-tokens 5
+      --speculative-disable-by-batch-size 4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  # ------------------------------------------------------------------ #
+  # TensorRT-LLM (maximum inference speed on NVIDIA)
+  # Activate: docker compose --profile tensorrt up -d
+  # Requires a TensorRT engine built from the model
+  # ------------------------------------------------------------------ #
+  qwen-tensorrt:
+    image: nvcr.io/nvidia/tritonserver:24.12-trtllm-python-py3
+    container_name: overmind-qwen-tensorrt
+    profiles: ["tensorrt"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+      - ./models:/models
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    command: >
+      python -m tensorrt_llm.commands.serve
+      --model_dir /models/${TRTLLM_ENGINE:-overmind-stellaris-trt}
+      --port 8000
+      --host 0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

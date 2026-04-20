@@ -20,6 +20,9 @@ mod_name = "stellaris_overmind"
 # Provider options: "qwen-vllm" | "openai-compat" | "ollama" | "stub"
 provider = "qwen-vllm"
 
+# Mode: "local" (default), "online" (cloud API only), "hybrid" (local + cloud fallback)
+mode = "local"
+
 # vLLM endpoint (default Docker compose exposes on 8000)
 base_url = "http://localhost:8000"
 
@@ -33,8 +36,29 @@ max_tokens = 256
 temperature = 0.3
 timeout_s = 30.0
 
+# Token optimization: minified JSON in prompts (saves ~30% tokens)
+compact_json = true
+# Cache static prompt prefixes between ticks
+prompt_cache = true
+
 # Only needed for remote API providers
 # api_key = ""
+
+# Online provider — used when mode = "online" or "hybrid"
+# Any OpenAI-compatible API: OpenRouter, Together, Groq, Azure AI Foundry, etc.
+# [llm.online]
+# base_url = "https://openrouter.ai/api/v1"
+# model = "qwen/qwen-2.5-72b-instruct"
+# api_key = ""  # set via OVERMIND_LLM_ONLINE_API_KEY env var
+# max_tokens = 256
+# temperature = 0.3
+# timeout_s = 60.0
+
+# Azure AI Foundry example:
+# [llm.online]
+# base_url = "https://your-project.services.ai.azure.com/models"
+# model = "Qwen2.5-72B-Instruct"
+# api_key = ""  # set via OVERMIND_LLM_ONLINE_API_KEY or AZURE_AI_KEY
 
 [bridge]
 # Autosave directory — the engine watches this for new .sav files.
@@ -60,3 +84,66 @@ civics = ["Corvée System", "Planet Forgers"]
 traits = ["Ingenious", "Industrious"]
 origin = "Cybernetic Creed"
 government = "Imperial"
+
+[target]
+# Which empires the Overmind controls.
+# "player" — control the human player's empire (default)
+# "ai"     — control AI empires (replaces Stellaris' built-in AI)
+mode = "player"
+
+# AI mode only: which AI country IDs to control (empty = all AI empires)
+# ai_country_ids = [1, 2, 5]
+
+# AI mode only: country IDs to skip
+# ai_exclude_ids = []
+
+# AI mode only: skip Fallen Empires (they have special behavior)
+ai_exclude_fallen = true
+
+[multi_agent]
+# Enable multi-agent council mode (experimental)
+# When false, uses the existing single-prompt decision engine.
+enabled = false
+
+# Run sub-agents in parallel (uses threading)
+parallel = true
+
+# Use LLM for arbitration in democratic/oligarchic governments.
+# When false, arbitration is always code-based (faster).
+arbiter_uses_llm = true
+
+[planner]
+# Enable strategic planner (runs every N in-game years or on phase transitions)
+# Produces long-term context injected into sub-agent prompts.
+enabled = false
+
+# Provider: "same" uses the main LLM, or set a separate endpoint.
+provider = "same"
+# base_url = "http://localhost:11434"   # e.g. Ollama for a larger model
+# model = "qwen2.5:14b"
+
+# How often to re-plan (in-game years).  Also re-plans on phase transitions.
+interval_years = 5
+
+# Planner gets more output room than decision agents.
+max_tokens = 512
+temperature = 0.4
+
+[training]
+# Training pipeline settings for creating a Stellaris-specific model.
+replay_dir = "training/replay_buffer"
+
+# Minimum composite score for a decision to be included in SFT training data
+sft_threshold = 0.3
+
+# Minimum score gap between chosen/rejected for DPO pairs
+dpo_margin = 0.2
+
+# Teacher model for distillation (used by scripts/collect_teacher.py)
+# teacher_model = "qwen/qwen-2.5-72b-instruct"
+# teacher_base_url = "https://openrouter.ai/api/v1"
+# teacher_api_key = ""   # set via OVERMIND_TEACHER_API_KEY env var
+
+# Quantization method for final model export
+quantize_method = "gptq"   # gptq | awq
+quantize_bits = 4

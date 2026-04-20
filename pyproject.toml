@@ -23,10 +23,19 @@ training = [
     "accelerate>=1.0",
     "bitsandbytes>=0.44",
 ]
+console = [
+    "rich>=13.0",
+]
+tracking = [
+    "wandb>=0.19",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.5",
     "mypy>=1.10",
+]
+all = [
+    "stellaris-overmind[training,console,tracking]",
 ]
 
 [project.scripts]
@@ -46,7 +55,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["transformers.*", "peft.*", "trl.*", "datasets.*"]
+module = ["transformers.*", "peft.*", "trl.*", "datasets.*", "wandb.*", "auto_gptq.*", "awq.*", "unsloth.*", "rich.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

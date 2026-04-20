@@ -206,3 +206,23 @@ class BridgeWriter:
         """Remove the directive file after the mod acknowledges execution."""
         if self._directive_path.exists():
             self._directive_path.unlink()
+
+    def write_directive_for(self, country_id: int, directive: dict) -> None:
+        """Write a directive for a specific AI empire.
+
+        Creates ``directive_<country_id>.json`` in the bridge directory.
+        The mod reads each per-empire directive and scopes execution to
+        the matching country.
+        """
+        self._config.bridge_dir.mkdir(parents=True, exist_ok=True)
+        path = self._config.bridge_dir / f"directive_{country_id}.json"
+        tmp_path = path.with_suffix(".tmp")
+        tmp_path.write_text(
+            json.dumps(directive, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        tmp_path.replace(path)
+        log.debug(
+            "Wrote directive for country %d: action=%s",
+            country_id, directive.get("action"),
+        )

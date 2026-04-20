@@ -15,7 +15,7 @@ Ruleset hierarchy (highest → lowest priority):
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 GAME_VERSION = "4.3.4"
@@ -51,6 +51,10 @@ def _phase_from_year(year: int) -> GamePhase:
     if year < 2320:
         return GamePhase.MID
     return GamePhase.LATE
+
+
+# Public alias for cross-module use
+phase_from_year = _phase_from_year
 
 
 # ======================================================================== #

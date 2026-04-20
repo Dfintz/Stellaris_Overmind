@@ -1,18 +1,45 @@
 # ============================================================
 # Stellaris Overmind — Scripted Effects (Action Executor)
 #
-# Each macro action from the LLM is mapped to a scripted effect
-# that uses Stellaris' built-in AI weights and effects.
+# Each macro action from the LLM is mapped to a scripted effect.
+# The LLM decides WHAT to do; Stellaris' micro-AI handles HOW.
 #
-# These are deliberately simple — the LLM decides WHAT to do,
-# Stellaris' micro-AI handles HOW to do it.
+# IMPORTANT: Each action FIRST removes all previous overmind
+# modifiers to prevent stacking, then applies the new one.
 # ============================================================
+
+
+# --- Helper: remove all overmind modifiers before applying new ---
+overmind_clear_modifiers = {
+	remove_modifier = overmind_expansion_focus
+	remove_modifier = overmind_military_focus
+	remove_modifier = overmind_economy_focus
+	remove_modifier = overmind_research_focus
+	remove_modifier = overmind_diplomacy_focus
+	remove_modifier = overmind_war_preparation
+	remove_modifier = overmind_defense_focus
+	remove_modifier = overmind_consolidation
+	remove_modifier = overmind_colonize_focus
+	remove_modifier = overmind_starbase_focus
+	remove_modifier = overmind_espionage_focus
+	# Clear personality stance flags
+	remove_country_flag = overmind_aggressive
+	remove_country_flag = overmind_defensive
+	remove_country_flag = overmind_full_assault
+	# Clear fleet sub-type flags
+	remove_country_flag = overmind_fleet_corvettes
+	remove_country_flag = overmind_fleet_battleships
+	remove_country_flag = overmind_fleet_balanced
+	# Clear colonize preference flags
+	remove_country_flag = overmind_colonize_habitats
+	remove_country_flag = overmind_colonize_gaia
+}
 
 
 # --- EXPAND: Build outposts, claim systems ---
 overmind_action_expand = {
-	log = "[OVERMIND] Action: EXPAND"
-	# Increase expansion priority via country modifier
+	overmind_clear_modifiers = yes
+	log = "[OVERMIND] Action: EXPAND for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_expansion_focus
 		days = 180
@@ -21,18 +48,41 @@ overmind_action_expand = {
 
 
 # --- BUILD_FLEET: Queue ship construction ---
+# Sub-action variable overmind_subaction controls fleet type:
+#   0 = balanced (default)
+#   1 = corvette swarm
+#   2 = battleship focus
 overmind_action_build_fleet = {
-	log = "[OVERMIND] Action: BUILD_FLEET"
+	overmind_clear_modifiers = yes
+	set_country_flag = overmind_aggressive
+	log = "[OVERMIND] Action: BUILD_FLEET for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_military_focus
 		days = 180
 	}
+	# Check sub-action for fleet type preference
+	if = {
+		limit = { check_variable = { which = overmind_subaction value = 1 } }
+		set_country_flag = overmind_fleet_corvettes
+		log = "[OVERMIND] Fleet type: corvette swarm"
+	}
+	else_if = {
+		limit = { check_variable = { which = overmind_subaction value = 2 } }
+		set_country_flag = overmind_fleet_battleships
+		log = "[OVERMIND] Fleet type: battleship focus"
+	}
+	else = {
+		set_country_flag = overmind_fleet_balanced
+		log = "[OVERMIND] Fleet type: balanced"
+	}
+	set_variable = { which = overmind_subaction value = 0 }
 }
 
 
 # --- IMPROVE_ECONOMY: Build districts, buildings ---
 overmind_action_improve_economy = {
-	log = "[OVERMIND] Action: IMPROVE_ECONOMY"
+	overmind_clear_modifiers = yes
+	log = "[OVERMIND] Action: IMPROVE_ECONOMY for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_economy_focus
 		days = 180
@@ -41,38 +91,116 @@ overmind_action_improve_economy = {
 
 
 # --- FOCUS_TECH: Prioritize research ---
+# Also enforces Academic Privilege living standard if available
 overmind_action_focus_tech = {
-	log = "[OVERMIND] Action: FOCUS_TECH"
+	overmind_clear_modifiers = yes
+	log = "[OVERMIND] Action: FOCUS_TECH for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_research_focus
 		days = 180
+	}
+	# Enforce research-friendly policies
+	if = {
+		limit = {
+			NOR = {
+				has_ethic = ethic_gestalt_consciousness
+				has_policy_flag = academic_privilege
+			}
+			can_set_policy = {
+				policy = living_standard
+				option = living_standard_academic_privilege
+			}
+		}
+		set_policy = {
+			policy = living_standard
+			option = living_standard_academic_privilege
+			cooldown = yes
+		}
+		log = "[OVERMIND] Set Academic Privilege living standard"
 	}
 }
 
 
 # --- DIPLOMACY: Manage relations ---
 overmind_action_diplomacy = {
-	log = "[OVERMIND] Action: DIPLOMACY"
+	overmind_clear_modifiers = yes
+	log = "[OVERMIND] Action: DIPLOMACY for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_diplomacy_focus
 		days = 180
+	}
+	# Enable diplomatic grants edict if available
+	if = {
+		limit = {
+			can_set_policy = {
+				policy = diplomatic_stance
+				option = diplomatic_stance_cooperative
+			}
+		}
+		set_policy = {
+			policy = diplomatic_stance
+			option = diplomatic_stance_cooperative
+			cooldown = yes
+		}
+		log = "[OVERMIND] Set Cooperative diplomatic stance"
 	}
 }
 
 
 # --- PREPARE_WAR: Shift to war footing ---
+# Also enforces militarist-friendly policies
 overmind_action_prepare_war = {
-	log = "[OVERMIND] Action: PREPARE_WAR"
+	overmind_clear_modifiers = yes
+	set_country_flag = overmind_aggressive
+	log = "[OVERMIND] Action: PREPARE_WAR for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_war_preparation
 		days = 360
+	}
+	# If already at war, escalate to full assault (max combat_bravery)
+	if = {
+		limit = { is_at_war = yes }
+		remove_country_flag = overmind_aggressive
+		set_country_flag = overmind_full_assault
+		log = "[OVERMIND] At war — full assault mode (combat_bravery=3.0)"
+	}
+	# Set aggressive war economy policies
+	if = {
+		limit = {
+			can_set_policy = {
+				policy = war_philosophy
+				option = war_philosophy_unrestricted
+			}
+		}
+		set_policy = {
+			policy = war_philosophy
+			option = war_philosophy_unrestricted
+			cooldown = yes
+		}
+		log = "[OVERMIND] Set Unrestricted Wars policy"
+	}
+	if = {
+		limit = {
+			can_set_policy = {
+				policy = economic_policy
+				option = economic_policy_militarist
+			}
+		}
+		set_policy = {
+			policy = economic_policy
+			option = economic_policy_militarist
+			cooldown = yes
+		}
+		log = "[OVERMIND] Set Militarist economic policy"
 	}
 }
 
 
 # --- DEFEND: Rally fleets, fortify chokepoints ---
 overmind_action_defend = {
-	log = "[OVERMIND] Action: DEFEND"
+	overmind_clear_modifiers = yes
+	set_country_flag = overmind_defensive
+	log = "[OVERMIND] Action: DEFEND for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_defense_focus
 		days = 180
@@ -82,27 +210,62 @@ overmind_action_defend = {
 
 # --- CONSOLIDATE: Pause expansion, fix deficits ---
 overmind_action_consolidate = {
-	log = "[OVERMIND] Action: CONSOLIDATE"
+	overmind_clear_modifiers = yes
+	set_country_flag = overmind_defensive
+	log = "[OVERMIND] Action: CONSOLIDATE for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_consolidation
 		days = 180
+	}
+	# Switch to civilian economy to recover
+	if = {
+		limit = {
+			can_set_policy = {
+				policy = economic_policy
+				option = economic_policy_civilian
+			}
+		}
+		set_policy = {
+			policy = economic_policy
+			option = economic_policy_civilian
+			cooldown = yes
+		}
+		log = "[OVERMIND] Set Civilian economic policy"
 	}
 }
 
 
 # --- COLONIZE: Send colony ships ---
+# Sub-action variable overmind_subaction controls preference:
+#   0 = any habitable (default)
+#   1 = habitats only (Void Dwellers)
+#   2 = gaia worlds preferred
 overmind_action_colonize = {
-	log = "[OVERMIND] Action: COLONIZE"
+	overmind_clear_modifiers = yes
+	log = "[OVERMIND] Action: COLONIZE for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_colonize_focus
 		days = 180
 	}
+	# Check sub-action for colonization preference
+	if = {
+		limit = { check_variable = { which = overmind_subaction value = 1 } }
+		set_country_flag = overmind_colonize_habitats
+		log = "[OVERMIND] Colonize: habitats only"
+	}
+	else_if = {
+		limit = { check_variable = { which = overmind_subaction value = 2 } }
+		set_country_flag = overmind_colonize_gaia
+		log = "[OVERMIND] Colonize: gaia preferred"
+	}
+	set_variable = { which = overmind_subaction value = 0 }
 }
 
 
 # --- BUILD_STARBASE: Upgrade/construct starbases ---
 overmind_action_build_starbase = {
-	log = "[OVERMIND] Action: BUILD_STARBASE"
+	overmind_clear_modifiers = yes
+	log = "[OVERMIND] Action: BUILD_STARBASE for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_starbase_focus
 		days = 180
@@ -112,7 +275,8 @@ overmind_action_build_starbase = {
 
 # --- ESPIONAGE: Build spy networks, run operations ---
 overmind_action_espionage = {
-	log = "[OVERMIND] Action: ESPIONAGE"
+	overmind_clear_modifiers = yes
+	log = "[OVERMIND] Action: ESPIONAGE for [This.GetName]"
 	add_modifier = {
 		modifier = overmind_espionage_focus
 		days = 180

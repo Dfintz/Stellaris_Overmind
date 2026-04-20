@@ -1,0 +1,305 @@
+# ============================================================
+# Stellaris Overmind — AI Personality Override
+#
+# This personality is assigned to empires controlled by the
+# Overmind.  It dynamically adjusts based on the LLM's current
+# directive via country flags set by the action executor.
+#
+# The personality uses Stellaris' native AI weight/modifier
+# system so the built-in AI actually follows the LLM's strategy:
+#   - weapon_preferences → our 4.3 meta (kinetic = autocannon)
+#   - armor/shields/hull ratios → balanced 4.3 meta
+#   - aggressiveness → scaled by war willingness
+#   - military_spending → scaled by directive
+#   - colony_spending → scaled by directive
+#
+# The allow block restricts this personality to empires with
+# the overmind_active flag, so it never applies to vanilla AI.
+# ============================================================
+
+overmind_controlled = {
+	# ---- Personality archetype ----
+	# hegemon: balanced focus on superiority — fits our strategic AI
+	type = hegemon
+
+	# ---- Numeric modifiers ----
+	# Base values — conservative defaults, modified by country flags
+	aggressiveness = 1.0
+	trade_willingness = 0.8
+	bravery = 1.0
+	combat_bravery = 1.5
+
+	military_spending = 1.0
+	colony_spending = 1.0
+
+	# Diplomatic acceptance — neutral base
+	federation_acceptance = 0
+	nap_acceptance = 0
+	defensive_pact_acceptance = 10
+	migration_pact_acceptance = 0
+	commercial_pact_acceptance = 10
+	research_agreement_acceptance = 20
+
+	# Threat perception — alert but not paranoid
+	threat_modifier = 1.0
+	threat_others_modifier = 0.75
+	friction_modifier = 1.0
+	claims_modifier = 1.5
+
+	# ---- Ship design meta (4.3.4) ----
+	# Autocannon + Plasma is the swarm meta for corvettes/destroyers
+	# Kinetic weapon preference ensures autocannon selection
+	weapon_preferences = weapon_type_kinetic
+
+	# Balanced defensive slots (4.3 meta: shields slightly favored)
+	armor_ratio = 0.3
+	shields_ratio = 0.5
+	hull_ratio = 0.2
+
+	# ---- Behaviours ----
+	behaviour = {
+		conqueror = yes
+		subjugator = yes
+		liberator = no
+		opportunist = yes
+		slaver = no
+		caste_system = no
+		uplifter = no
+		purger = no
+		displacer = no
+		infiltrator = no
+		dominator = no
+		robot_exploiter = yes
+		robot_liberator = no
+		propagator = no
+		multispecies = yes
+		crisis_fighter = yes
+		crisis_leader = no
+	}
+
+	# ---- Allow block ----
+	# Only applies to empires with the overmind_active flag
+	allow = {
+		has_country_flag = overmind_active
+		is_country_type = default
+	}
+
+	# ---- Weight ----
+	# Very high weight ensures this personality is always chosen
+	# when the allow conditions are met
+	weight_modifier = {
+		weight = 10000
+		modifier = {
+			factor = 0
+			NOT = { has_country_flag = overmind_active }
+		}
+	}
+}
+
+
+# ============================================================
+# Overmind Aggressive variant — applied via country flag
+# when the LLM directive is PREPARE_WAR or BUILD_FLEET
+# ============================================================
+
+overmind_controlled_aggressive = {
+	type = hegemon
+
+	aggressiveness = 2.0
+	trade_willingness = 0.5
+	bravery = 1.5
+	combat_bravery = 2.0
+
+	military_spending = 1.5
+	colony_spending = 0.5
+
+	federation_acceptance = -20
+	nap_acceptance = -30
+	defensive_pact_acceptance = 0
+	migration_pact_acceptance = -10
+	commercial_pact_acceptance = 0
+	research_agreement_acceptance = 10
+
+	threat_modifier = 0.75
+	threat_others_modifier = 0.5
+	friction_modifier = 1.5
+	claims_modifier = 2.0
+
+	weapon_preferences = weapon_type_kinetic
+	armor_ratio = 0.3
+	shields_ratio = 0.5
+	hull_ratio = 0.2
+
+	behaviour = {
+		conqueror = yes
+		subjugator = yes
+		liberator = no
+		opportunist = yes
+		slaver = no
+		caste_system = no
+		uplifter = no
+		purger = no
+		displacer = no
+		infiltrator = no
+		dominator = yes
+		robot_exploiter = yes
+		robot_liberator = no
+		propagator = no
+		multispecies = yes
+		crisis_fighter = yes
+		crisis_leader = no
+	}
+
+	allow = {
+		has_country_flag = overmind_active
+		has_country_flag = overmind_aggressive
+		is_country_type = default
+	}
+
+	weight_modifier = {
+		weight = 20000
+		modifier = {
+			factor = 0
+			NOT = { has_country_flag = overmind_aggressive }
+		}
+	}
+}
+
+
+# ============================================================
+# Overmind Defensive variant — applied via country flag
+# when the LLM directive is DEFEND or CONSOLIDATE
+# ============================================================
+
+overmind_controlled_defensive = {
+	type = hegemon
+
+	aggressiveness = 0.25
+	trade_willingness = 1.0
+	bravery = 0.5
+	combat_bravery = 0.75
+
+	military_spending = 0.8
+	colony_spending = 0.5
+
+	federation_acceptance = 30
+	nap_acceptance = 30
+	defensive_pact_acceptance = 40
+	migration_pact_acceptance = 10
+	commercial_pact_acceptance = 20
+	research_agreement_acceptance = 30
+
+	threat_modifier = 1.5
+	threat_others_modifier = 1.0
+	friction_modifier = 0.5
+	claims_modifier = 0.5
+
+	weapon_preferences = weapon_type_kinetic
+	armor_ratio = 0.3
+	shields_ratio = 0.5
+	hull_ratio = 0.2
+
+	behaviour = {
+		conqueror = no
+		subjugator = no
+		liberator = no
+		opportunist = no
+		slaver = no
+		caste_system = no
+		uplifter = no
+		purger = no
+		displacer = no
+		infiltrator = no
+		dominator = no
+		robot_exploiter = yes
+		robot_liberator = no
+		propagator = no
+		multispecies = yes
+		crisis_fighter = yes
+		crisis_leader = no
+	}
+
+	allow = {
+		has_country_flag = overmind_active
+		has_country_flag = overmind_defensive
+		is_country_type = default
+	}
+
+	weight_modifier = {
+		weight = 20000
+		modifier = {
+			factor = 0
+			NOT = { has_country_flag = overmind_defensive }
+		}
+	}
+}
+
+
+# ============================================================
+# Overmind Full Assault variant — maximum aggression during
+# active wars.  Set overmind_full_assault flag when at war +
+# PREPARE_WAR to make fleets never retreat.
+# ============================================================
+
+overmind_controlled_assault = {
+	type = hegemon
+
+	aggressiveness = 3.0
+	trade_willingness = 0.25
+	bravery = 2.0
+	combat_bravery = 3.0      # rarely retreat in battle
+
+	military_spending = 2.0
+	colony_spending = 0.25
+
+	federation_acceptance = -50
+	nap_acceptance = -50
+	defensive_pact_acceptance = -20
+	migration_pact_acceptance = -20
+	commercial_pact_acceptance = -10
+	research_agreement_acceptance = 0
+
+	threat_modifier = 0.5
+	threat_others_modifier = 0.25
+	friction_modifier = 2.0
+	claims_modifier = 3.0
+
+	weapon_preferences = weapon_type_kinetic
+	armor_ratio = 0.3
+	shields_ratio = 0.5
+	hull_ratio = 0.2
+
+	behaviour = {
+		conqueror = yes
+		subjugator = yes
+		liberator = no
+		opportunist = yes
+		slaver = no
+		caste_system = no
+		uplifter = no
+		purger = no
+		displacer = no
+		infiltrator = no
+		dominator = yes
+		robot_exploiter = yes
+		robot_liberator = no
+		propagator = no
+		multispecies = yes
+		crisis_fighter = yes
+		crisis_leader = no
+	}
+
+	allow = {
+		has_country_flag = overmind_active
+		has_country_flag = overmind_full_assault
+		is_country_type = default
+	}
+
+	weight_modifier = {
+		weight = 30000
+		modifier = {
+			factor = 0
+			NOT = { has_country_flag = overmind_full_assault }
+		}
+	}
+}

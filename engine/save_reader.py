@@ -142,34 +142,70 @@ class SaveReader:
         # Use meta name as display name (resolved from localization)
         display_name = str(meta.get("name", player_name))
 
-        # Build state snapshot
-        state: dict = {
-            "version": GAME_VERSION,
-            "year": year,
-            "month": month,
-            "empire": _extract_empire_info(player_country, display_name),
-            "economy": _extract_economy(player_country),
-            "fleets": _extract_fleets(gamestate, player_country),
-            "colonies": _extract_colonies(gamestate, player_country),
-            "known_empires": _extract_known_empires(
-                gamestate, player_country,
-            ),
-            "technology": _extract_technology(player_country),
-            "traditions": _extract_traditions(player_country),
-            "ascension_perks": _extract_ascension_perks(player_country),
-            "policies": _extract_policies(player_country),
-            "edicts": _extract_edicts(player_country),
-            "wars": _extract_wars(gamestate, player_id),
-            "starbases": _extract_starbases(gamestate, player_country),
-            "leaders": _extract_leaders(gamestate, player_country),
-            "naval_capacity": _extract_capacity(player_country),
-            "available_actions": [
-                "EXPAND", "BUILD_FLEET", "IMPROVE_ECONOMY", "FOCUS_TECH",
-                "DIPLOMACY", "PREPARE_WAR", "DEFEND", "CONSOLIDATE",
-                "COLONIZE", "BUILD_STARBASE", "ESPIONAGE",
-            ],
-        }
-        return state
+        return _extract_state_for_country(
+            gamestate, player_country, player_id, display_name, year, month,
+        )
+
+    def read_ai_states(
+        self,
+        country_ids: list[int] | None = None,
+        exclude_ids: list[int] | None = None,
+        exclude_fallen: bool = True,
+    ) -> list[dict] | None:
+        """Read the latest save and return state snapshots for AI empires.
+
+        Each AI empire gets its own FoW-filtered state, with empire info
+        auto-detected from the save (no config.toml [empire] needed).
+
+        Parameters
+        ----------
+        country_ids : list[int] | None
+            Specific AI country IDs to extract.  If *None*, extracts all.
+        exclude_ids : list[int] | None
+            Country IDs to skip (e.g. player, primitives).
+        exclude_fallen : bool
+            If *True*, skip Fallen Empires.
+        """
+        latest = self.find_latest_save()
+        if latest is None:
+            return None
+
+        mtime = os.path.getmtime(latest)
+        if mtime <= self._last_mtime:
+            return None
+
+        log.info("Parsing save file for AI empires: %s", latest.name)
+        try:
+            raw = parse_save(latest)
+        except Exception:
+            log.exception("Failed to parse save file: %s", latest)
+            return None
+
+        self._last_mtime = mtime
+        self._last_save_path = latest
+
+        meta = raw.get("meta", {})
+        gamestate = raw.get("gamestate", {})
+
+        date = meta.get("date", gamestate.get("date", "2200.01.01"))
+        year, month = _parse_date(date)
+
+        # Find all AI countries
+        ai_countries = _find_ai_countries(
+            gamestate, country_ids, exclude_ids, exclude_fallen,
+        )
+
+        states = []
+        for cid, country in ai_countries:
+            name = _get_country_display_name(country, str(cid))
+            state = _extract_state_for_country(
+                gamestate, country, str(cid), name, year, month,
+            )
+            state["country_id"] = cid
+            states.append(state)
+
+        log.info("Extracted %d AI empire states (year %d)", len(states), year)
+        return states
 
 
 # ------------------------------------------------------------------ #
@@ -231,6 +267,117 @@ def _find_player_country(
         if isinstance(country, dict) and country.get("type") == "default":
             return country, str(cid)
     return {}, "0"
+
+
+def _extract_state_for_country(
+    gamestate: dict,
+    country: dict,
+    country_id: str,
+    display_name: str,
+    year: int,
+    month: int,
+) -> dict:
+    """Build a state snapshot for any country (player or AI)."""
+    return {
+        "version": GAME_VERSION,
+        "year": year,
+        "month": month,
+        "empire": _extract_empire_info(country, display_name),
+        "economy": _extract_economy(country),
+        "fleets": _extract_fleets(gamestate, country),
+        "colonies": _extract_colonies(gamestate, country),
+        "known_empires": _extract_known_empires(gamestate, country),
+        "technology": _extract_technology(country),
+        "traditions": _extract_traditions(country),
+        "ascension_perks": _extract_ascension_perks(country),
+        "policies": _extract_policies(country),
+        "edicts": _extract_edicts(country),
+        "wars": _extract_wars(gamestate, country_id),
+        "starbases": _extract_starbases(gamestate, country),
+        "leaders": _extract_leaders(gamestate, country),
+        "naval_capacity": _extract_capacity(country),
+        "available_actions": [
+            "EXPAND", "BUILD_FLEET", "IMPROVE_ECONOMY", "FOCUS_TECH",
+            "DIPLOMACY", "PREPARE_WAR", "DEFEND", "CONSOLIDATE",
+            "COLONIZE", "BUILD_STARBASE", "ESPIONAGE",
+        ],
+    }
+
+
+def _find_ai_countries(
+    gamestate: dict,
+    include_ids: list[int] | None = None,
+    exclude_ids: list[int] | None = None,
+    exclude_fallen: bool = True,
+) -> list[tuple[int, dict]]:
+    """Find all AI-controlled countries in the gamestate.
+
+    Returns a list of ``(country_id, country_dict)`` tuples.
+    Skips primitives, enclaves, and (optionally) Fallen Empires.
+    """
+    countries = gamestate.get("country", {})
+    if not isinstance(countries, dict):
+        return []
+
+    # Identify player country IDs to exclude
+    player_ids: set[int] = set()
+    players = gamestate.get("player", [])
+    if isinstance(players, list):
+        for p in players:
+            if isinstance(p, dict) and p.get("country") is not None:
+                player_ids.add(int(p["country"]))
+
+    exclude_set = set(exclude_ids or []) | player_ids
+
+    # Country types that are NOT real empires
+    skip_types = {"primitive", "enclave", "rebel", "pirate", "caravaneer"}
+    if exclude_fallen:
+        skip_types.add("fallen_empire")
+        skip_types.add("awakened_fallen_empire")
+
+    result = []
+    for cid_str, country in countries.items():
+        if not isinstance(country, dict):
+            continue
+        try:
+            cid = int(cid_str)
+        except (ValueError, TypeError):
+            continue
+
+        if cid in exclude_set:
+            continue
+
+        if include_ids and cid not in include_ids:
+            continue
+
+        country_type = str(country.get("type", "")).lower()
+        if country_type in skip_types:
+            continue
+
+        # Must be a real empire type
+        if country_type not in ("default", "ai_empire", "fallen_empire",
+                                 "awakened_fallen_empire", ""):
+            continue
+
+        result.append((cid, country))
+
+    return result
+
+
+def _get_country_display_name(country: dict, fallback: str) -> str:
+    """Extract a display name from a country dict."""
+    name = country.get("name", "")
+    if isinstance(name, dict):
+        # Complex name with key + variables
+        key = name.get("key", "")
+        if key:
+            return str(key)
+        meta_name = name.get("meta", {}).get("name", "")
+        if meta_name:
+            return str(meta_name)
+    if isinstance(name, str) and name:
+        return name
+    return f"Empire_{fallback}"
 
 
 # ------------------------------------------------------------------ #

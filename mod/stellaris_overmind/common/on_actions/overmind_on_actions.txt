@@ -15,5 +15,13 @@ on_monthly_pulse_country = {
 on_game_start = {
 	events = {
 		overmind.1
+		overmind.2
+	}
+}
+
+# Yearly pulse — re-check for new AI empires (spawned mid-game)
+on_yearly_pulse_country = {
+	events = {
+		overmind.2
 	}
 }

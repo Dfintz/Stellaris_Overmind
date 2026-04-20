@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from engine.bridge import BridgeConfig, BridgeWriter, UnifiedBridge
+from engine.config import MultiAgentConfig, PlannerConfig
 from engine.decision_engine import Directive, build_prompt, parse_llm_response
 from engine.llm_provider import LLMProvider, LLMProviderError, StubProvider
 from engine.personality_shards import build_personality
@@ -64,6 +65,9 @@ class GameLoopController:
         bridge_config: BridgeConfig | None = None,
         max_retries: int = 2,
         recorder: GameRecorder | None = None,
+        multi_agent_config: MultiAgentConfig | None = None,
+        planner_config: PlannerConfig | None = None,
+        planner_provider: LLMProvider | None = None,
     ) -> None:
         self._empire = empire
         self._provider = provider or StubProvider()
@@ -91,12 +95,48 @@ class GameLoopController:
             government=empire.government,
         )
 
+        # Multi-agent council (opt-in)
+        self._council = None
+        ma = multi_agent_config or MultiAgentConfig()
+        if ma.enabled:
+            from engine.multi_agent import CouncilOrchestrator
+
+            self._council = CouncilOrchestrator(
+                provider=self._provider,
+                government=empire.government,
+                personality=self._personality,
+                ruleset=self._ruleset,
+                parallel=ma.parallel,
+                arbiter_uses_llm=ma.arbiter_uses_llm,
+            )
+
         log.info(
-            "Controller initialized: origin=%s gov=%s meta_tier=%s provider=%s",
+            "Controller initialized: origin=%s gov=%s meta_tier=%s provider=%s multi_agent=%s",
             empire.origin, empire.government,
             self._ruleset.get("meta_tier", "?"),
             self._provider.name,
+            ma.enabled,
         )
+
+        # Strategic planner (opt-in)
+        self._planner = None
+        pc = planner_config or PlannerConfig()
+        if pc.enabled:
+            from engine.strategic_planner import StrategicPlanner
+
+            if planner_provider is not None:
+                resolved_provider = planner_provider
+            elif pc.provider == "same":
+                resolved_provider = self._provider
+            else:
+                resolved_provider = None  # code-only
+            self._planner = StrategicPlanner(
+                provider=resolved_provider,
+                ruleset=self._ruleset,
+                personality=self._personality,
+                interval_years=pc.interval_years,
+            )
+            log.info("Strategic planner enabled: interval=%dy", pc.interval_years)
 
     def run(self) -> None:
         """Start the live loop.  Blocks until ``stop()`` is called."""
@@ -151,6 +191,9 @@ class GameLoopController:
         # Retroactively score older decisions now that we have fresh state
         self._recorder.update_outcomes(snapshot)
 
+        # Refresh strategic plan if due
+        self._maybe_replan(snapshot)
+
         directive = self._process_snapshot(snapshot)
         if directive is not None:
             self._emit_directive(directive, snapshot)
@@ -168,6 +211,11 @@ class GameLoopController:
         """Run the full decision pipeline on a state snapshot."""
         event = state.get("event")
 
+        # Multi-agent council path
+        if self._council is not None:
+            return self._process_council(state, event)
+
+        # Single-agent path (original)
         prompt = build_prompt(self._ruleset, self._personality, state, event)
 
         # Query LLM with retries
@@ -254,6 +302,53 @@ class GameLoopController:
         }
         self._writer.write_directive(payload)
 
+    def _process_council(self, state: dict, event: str | None) -> Directive | None:
+        """Run the multi-agent council pipeline on a state snapshot."""
+        strategic_context = None
+        if self._planner is not None:
+            strategic_context = self._planner.context
+
+        result = self._council.decide(state, event, strategic_context=strategic_context)
+        directive = result.directive
+        self.stats.last_decision_time_ms = result.total_latency_ms
+
+        log.info(
+            "Council: method=%s agents=%d latency=%.0fms",
+            result.arbitration_method,
+            len(result.recommendations),
+            result.total_latency_ms,
+        )
+        for rec in result.recommendations:
+            log.debug(
+                "  %s → %s (conf=%.2f): %s",
+                rec.agent_role, rec.action, rec.confidence, rec.reasoning,
+            )
+
+        # Validate (same gate as single-agent)
+        vresult = validate_directive(directive.to_dict(), self._ruleset, state)
+        if not vresult.valid:
+            self.stats.validation_errors += 1
+            log.warning(
+                "Council directive rejected: action=%s errors=%s",
+                directive.action, vresult.errors,
+            )
+            return None
+
+        for w in vresult.warnings:
+            log.info("Validation warning: %s", w)
+
+        self.stats.decisions_made += 1
+        self.stats.last_action = directive.action
+        return directive
+
+    def _maybe_replan(self, state: dict) -> None:
+        """Run the strategic planner if it's time for a new plan."""
+        if self._planner is None:
+            return
+        year = state.get("year", 0)
+        if self._planner.should_replan(year):
+            self._planner.plan(state)
+
     def _maybe_refresh_ruleset(self, state: dict) -> None:
         """Regenerate ruleset if the empire's ethics/civics changed mid-game."""
         empire_info = state.get("empire", {})
@@ -284,3 +379,363 @@ class GameLoopController:
                 origin=empire_info.get("origin", self._empire.origin),
                 government=empire_info.get("government", self._empire.government),
             )
+            # Sync council with updated context
+            if self._council is not None:
+                self._council.update_context(
+                    government=empire_info.get("government", self._empire.government),
+                    personality=self._personality,
+                    ruleset=self._ruleset,
+                )
+            # Sync planner with updated context
+            if self._planner is not None:
+                self._planner.update_context(
+                    ruleset=self._ruleset,
+                    personality=self._personality,
+                )
+
+
+# ====================================================================== #
+# AI Mode Controller — controls AI empires instead of the player
+# ====================================================================== #
+
+class AILoopController:
+    """Controls one or more AI empires using the LLM.
+
+    In AI mode, the engine:
+      1. Parses the save to find AI countries
+      2. For each AI empire, auto-detects ethics/civics/traits/origin
+      3. Generates a per-empire ruleset and personality
+      4. Runs the decision pipeline for each empire (parallel optional)
+      5. Writes per-empire directives (``directive_<cid>.json``)
+      6. Records decisions for training data collection
+
+    The mod then reads these and executes scoped to each AI country.
+    """
+
+    def __init__(
+        self,
+        provider: LLMProvider | None = None,
+        bridge_config: BridgeConfig | None = None,
+        max_retries: int = 2,
+        country_ids: list[int] | None = None,
+        exclude_ids: list[int] | None = None,
+        exclude_fallen: bool = True,
+        multi_agent_config: MultiAgentConfig | None = None,
+        parallel_empires: bool = False,
+        recorder: GameRecorder | None = None,
+    ) -> None:
+        self._provider = provider or StubProvider()
+        self._bridge_config = bridge_config or BridgeConfig()
+        self._writer = BridgeWriter(self._bridge_config)
+        self._max_retries = max_retries
+        self._country_ids = country_ids
+        self._exclude_ids = exclude_ids
+        self._exclude_fallen = exclude_fallen
+        self._multi_agent_config = multi_agent_config or MultiAgentConfig()
+        self._parallel_empires = parallel_empires
+        self._recorder = recorder
+        self._running = False
+
+        # Cache rulesets/personalities per country ID
+        self._rulesets: dict[int, dict] = {}
+        self._personalities: dict[int, dict] = {}
+        # Cache previous states for event detection
+        self._previous_states: dict[int, dict] = {}
+        # Cache councils for multi-agent mode
+        self._councils: dict[int, object] = {}
+
+        self.stats = LoopStats()
+
+        log.info(
+            "AI controller initialized: ids=%s exclude=%s parallel=%s multi_agent=%s",
+            country_ids or "all", exclude_ids or "none",
+            parallel_empires, self._multi_agent_config.enabled,
+        )
+
+    def run(self) -> None:
+        """Start the AI live loop.  Blocks until ``stop()`` is called."""
+        from engine.save_reader import SaveReader, SaveWatcherConfig
+
+        self._running = True
+        reader = SaveReader(SaveWatcherConfig(
+            save_dir=self._bridge_config.save_dir,
+            poll_interval_s=self._bridge_config.poll_interval_s,
+        ))
+
+        log.info("AI loop started — polling every %.1fs", self._bridge_config.poll_interval_s)
+
+        while self._running:
+            try:
+                states = reader.read_ai_states(
+                    country_ids=self._country_ids,
+                    exclude_ids=self._exclude_ids,
+                    exclude_fallen=self._exclude_fallen,
+                )
+                if states:
+                    self._process_all(states)
+            except KeyboardInterrupt:
+                log.info("Interrupted — shutting down")
+                break
+            except Exception:
+                log.exception("Unhandled error in AI loop tick")
+            time.sleep(self._bridge_config.poll_interval_s)
+
+        log.info("AI loop stopped — %d decisions made", self.stats.decisions_made)
+        if self._recorder:
+            log.info("Recorded %d AI decisions for training", self._recorder.record_count)
+
+    def stop(self) -> None:
+        self._running = False
+
+    def process_states(self, states: list[dict]) -> list[Directive | None]:
+        """Process a list of AI empire states.  For testing."""
+        return self._process_all(states)
+
+    def _process_all(self, states: list[dict]) -> list[Directive | None]:
+        """Run the decision pipeline for each AI empire."""
+        if self._parallel_empires and len(states) > 1:
+            return self._process_parallel(states)
+        return self._process_sequential(states)
+
+    def _process_sequential(self, states: list[dict]) -> list[Directive | None]:
+        """Process empires one at a time."""
+        results: list[Directive | None] = []
+        for state in states:
+            cid = state.get("country_id", 0)
+            directive = self._process_one(cid, state)
+            results.append(directive)
+            self._emit_and_record(cid, directive, state)
+        return results
+
+    def _process_parallel(self, states: list[dict]) -> list[Directive | None]:
+        """Process empires concurrently using threads."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        results_map: dict[int, Directive | None] = {}
+
+        with ThreadPoolExecutor(max_workers=min(len(states), 4)) as pool:
+            futures = {
+                pool.submit(self._process_one, s.get("country_id", 0), s): s
+                for s in states
+            }
+            for future in as_completed(futures):
+                state = futures[future]
+                cid = state.get("country_id", 0)
+                directive = future.result()
+                results_map[cid] = directive
+                self._emit_and_record(cid, directive, state)
+
+        # Return in original order
+        return [results_map.get(s.get("country_id", 0)) for s in states]
+
+    def _emit_and_record(
+        self, country_id: int, directive: Directive | None, state: dict,
+    ) -> None:
+        """Write directive to bridge and record for training."""
+        if directive is not None:
+            payload = directive.to_dict()
+            payload["country_id"] = country_id
+            payload["timestamp"] = f"{state.get('year', 0)}.{state.get('month', 0)}"
+            self._writer.write_directive_for(country_id, payload)
+
+            # Record for training
+            if self._recorder is not None:
+                self._recorder.record_decision(
+                    state=state,
+                    decision=directive.to_dict(),
+                    event=state.get("event"),
+                    validated=True,
+                    llm_latency_ms=self.stats.last_decision_time_ms,
+                    provider=self._provider.name,
+                )
+
+    def _process_one(self, country_id: int, state: dict) -> Directive | None:
+        """Run the decision pipeline for one AI empire."""
+        empire_info = state.get("empire", {})
+        ethics = empire_info.get("ethics", [])
+        civics = empire_info.get("civics", [])
+        origin = empire_info.get("origin", "")
+        government = empire_info.get("government", "")
+        traits = []  # traits aren't stored in country.government; use empty
+
+        # Generate or refresh ruleset for this empire
+        self._ensure_ruleset(country_id, ethics, civics, traits, origin, government)
+
+        ruleset = self._rulesets[country_id]
+        personality = self._personalities[country_id]
+
+        # Detect events by comparing to previous state
+        event = state.get("event")
+        if not event and country_id in self._previous_states:
+            event = self._detect_event(country_id, state)
+        self._previous_states[country_id] = state
+
+        # Multi-agent path
+        if self._multi_agent_config.enabled:
+            return self._process_council(country_id, state, event, ruleset, personality)
+
+        # Single-agent path
+        prompt = build_prompt(ruleset, personality, state, event)
+
+        # Query LLM
+        t0 = time.monotonic()
+        try:
+            response = self._provider.complete(prompt)
+        except LLMProviderError as exc:
+            self.stats.llm_errors += 1
+            log.error("AI empire %d LLM error: %s", country_id, exc)
+            return None
+
+        self.stats.last_decision_time_ms = (time.monotonic() - t0) * 1000
+
+        try:
+            directive = parse_llm_response(response.text)
+        except ValueError as exc:
+            self.stats.decisions_failed += 1
+            log.warning("AI empire %d parse error: %s", country_id, exc)
+            return None
+
+        # Validate
+        result = validate_directive(directive.to_dict(), ruleset, state)
+        if not result.valid:
+            self.stats.validation_errors += 1
+            log.warning(
+                "AI empire %d directive rejected: %s", country_id, result.errors,
+            )
+            return None
+
+        self.stats.decisions_made += 1
+        self.stats.last_action = directive.action
+        log.info(
+            "AI empire %d → %s (%.0fms)",
+            country_id, directive.action, self.stats.last_decision_time_ms,
+        )
+        return directive
+
+    def _process_council(
+        self,
+        country_id: int,
+        state: dict,
+        event: str | None,
+        ruleset: dict,
+        personality: dict,
+    ) -> Directive | None:
+        """Run multi-agent council for one AI empire."""
+        from engine.multi_agent import CouncilOrchestrator
+
+        if country_id not in self._councils:
+            self._councils[country_id] = CouncilOrchestrator(
+                provider=self._provider,
+                government=state.get("empire", {}).get("government", "Oligarchy"),
+                personality=personality,
+                ruleset=ruleset,
+                parallel=self._multi_agent_config.parallel,
+                arbiter_uses_llm=self._multi_agent_config.arbiter_uses_llm,
+            )
+
+        council = self._councils[country_id]
+        result = council.decide(state, event)
+        directive = result.directive
+        self.stats.last_decision_time_ms = result.total_latency_ms
+
+        # Validate
+        vresult = validate_directive(directive.to_dict(), ruleset, state)
+        if not vresult.valid:
+            self.stats.validation_errors += 1
+            log.warning(
+                "AI empire %d council rejected: %s", country_id, vresult.errors,
+            )
+            return None
+
+        self.stats.decisions_made += 1
+        self.stats.last_action = directive.action
+        log.info(
+            "AI empire %d council → %s (%.0fms)",
+            country_id, directive.action, result.total_latency_ms,
+        )
+        return directive
+
+    def _ensure_ruleset(
+        self,
+        country_id: int,
+        ethics: list[str],
+        civics: list[str],
+        traits: list[str],
+        origin: str,
+        government: str,
+    ) -> None:
+        """Generate ruleset if missing, or refresh if empire reformed."""
+        cached = self._rulesets.get(country_id)
+        if cached is not None:
+            # Check if ethics/civics changed (mid-game reform)
+            old_ethics = sorted(cached.get("_source_ethics", []))
+            new_ethics = sorted(ethics)
+            old_civics = sorted(cached.get("_source_civics", []))
+            new_civics = sorted(civics)
+            if old_ethics == new_ethics and old_civics == new_civics:
+                return  # no change
+            log.info(
+                "AI empire %d reformed: ethics=%s civics=%s — regenerating",
+                country_id, new_ethics, new_civics,
+            )
+
+        ruleset = generate_ruleset(
+            ethics=ethics, civics=civics, traits=traits,
+            origin=origin, government=government,
+        )
+        # Store source for later comparison
+        ruleset["_source_ethics"] = list(ethics)
+        ruleset["_source_civics"] = list(civics)
+
+        self._rulesets[country_id] = ruleset
+        self._personalities[country_id] = build_personality(
+            ethics=ethics, civics=civics, traits=traits,
+            origin=origin, government=government,
+        )
+
+        # Refresh council if it exists
+        if country_id in self._councils:
+            self._councils[country_id].update_context(
+                government=government,
+                personality=self._personalities[country_id],
+                ruleset=ruleset,
+            )
+
+        if cached is None:
+            log.info("Generated ruleset for AI empire %d (%s)", country_id, government)
+
+    def _detect_event(self, country_id: int, state: dict) -> str | None:
+        """Detect triggering events by comparing to previous state."""
+        prev = self._previous_states.get(country_id)
+        if prev is None:
+            return None
+
+        # War started
+        prev_wars = prev.get("wars", [])
+        curr_wars = state.get("wars", [])
+        if len(curr_wars) > len(prev_wars):
+            return "WAR_STARTED"
+
+        # War ended
+        if len(curr_wars) < len(prev_wars):
+            return "WAR_ENDED"
+
+        # Colony gained
+        prev_colonies = prev.get("colonies", [])
+        curr_colonies = state.get("colonies", [])
+        if len(curr_colonies) > len(prev_colonies):
+            return "COLONY_GAINED"
+
+        # Fleet lost (significant power drop)
+        prev_power = sum(f.get("power", 0) for f in prev.get("fleets", []))
+        curr_power = sum(f.get("power", 0) for f in state.get("fleets", []))
+        if prev_power > 0 and curr_power < prev_power * 0.5:
+            return "FLEET_DESTROYED"
+
+        # Economy crash
+        prev_energy = prev.get("economy", {}).get("energy", 0)
+        curr_energy = state.get("economy", {}).get("energy", 0)
+        if prev_energy > 50 and curr_energy < 0:
+            return "ECONOMY_CRASH"
+
+        return None

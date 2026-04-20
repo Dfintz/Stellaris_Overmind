@@ -8,26 +8,24 @@
 # We can't read JSON from Clausewitz directly, so we use a
 # flag-based polling system:
 #
-# 1. Python engine sets a global flag: overmind_directive_ready
-# 2. This event fires on monthly pulse, checks for the flag
-# 3. Reads the action from scripted variables
-# 4. Calls the appropriate scripted effect
-# 5. Clears the flag
+# 1. Python engine sets a per-country flag via console:
+#      effect <country_scope> = { set_country_flag = overmind_directive_ready }
+#      effect <country_scope> = { set_variable = { which = overmind_action value = N } }
+# 2. This event fires on monthly pulse per country
+# 3. Checks THIS country's flag (not global — supports multi-empire AI mode)
+# 4. Reads the action from country-scoped variable
+# 5. Calls the appropriate scripted effect (scoped to THIS country)
+# 6. Clears the flag
 #
-# NOTE: The actual JSON → game-flag translation is done by a
-# small helper in the Python engine that writes Clausewitz
-# console commands, or by using the effect log file approach.
-#
-# For now, the mod responds to flags set via console commands:
-#   effect set_global_flag = overmind_directive_ready
-#   effect set_variable = { which = overmind_action value = 1 }
+# This design supports both player mode (1 empire) and AI mode
+# (multiple empires each getting their own directive).
 # ============================================================
 
 namespace = overmind
 
 
 # ============================================================
-# Event 1: Game start initialization
+# Event 1: Game start initialization (Player mode)
 # ============================================================
 country_event = {
 	id = overmind.1
@@ -46,7 +44,34 @@ country_event = {
 
 
 # ============================================================
+# Event 2: Game start initialization (AI mode)
+# Activates for AI empires so the Python engine can control them.
+# Only fires if the global overmind_ai_mode flag is set.
+# ============================================================
+country_event = {
+	id = overmind.2
+	hide_window = yes
+	is_triggered_only = yes
+
+	trigger = {
+		is_ai = yes
+		has_global_flag = overmind_ai_mode
+		NOT = { has_country_flag = overmind_active }
+		# Skip primitives, enclaves, etc.
+		is_country_type = default
+	}
+
+	immediate = {
+		set_country_flag = overmind_active
+		log = "[OVERMIND] AI mode: initialized for [This.GetName] (country [This.GetID])"
+	}
+}
+
+
+# ============================================================
 # Event 100: Monthly directive reader (heartbeat)
+# Uses per-country flags and variables — each empire gets its
+# own directive independently.  No global state shared.
 # ============================================================
 country_event = {
 	id = overmind.100
@@ -55,91 +80,87 @@ country_event = {
 
 	trigger = {
 		has_country_flag = overmind_active
+		has_country_flag = overmind_directive_ready
 	}
 
 	immediate = {
-		# Check if a directive is ready
+		# Read the action variable (scoped to THIS country) and dispatch
+		# Action codes: 1=EXPAND 2=BUILD_FLEET 3=IMPROVE_ECONOMY
+		# 4=FOCUS_TECH 5=DIPLOMACY 6=PREPARE_WAR
+		# 7=DEFEND 8=CONSOLIDATE 9=COLONIZE 10=BUILD_STARBASE
+		# 11=ESPIONAGE
+
 		if = {
-			limit = { has_global_flag = overmind_directive_ready }
-
-			# Read the action variable and dispatch
-			# Action codes: 1=EXPAND 2=BUILD_FLEET 3=IMPROVE_ECONOMY
-			# 4=FOCUS_TECH 5=DIPLOMACY 6=PREPARE_WAR
-			# 7=DEFEND 8=CONSOLIDATE 9=COLONIZE 10=BUILD_STARBASE
-			# 11=ESPIONAGE
-
-			if = {
-				limit = {
-					check_variable = { which = overmind_action value = 1 }
-				}
-				overmind_action_expand = yes
+			limit = {
+				check_variable = { which = overmind_action value = 1 }
 			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 2 }
-				}
-				overmind_action_build_fleet = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 3 }
-				}
-				overmind_action_improve_economy = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 4 }
-				}
-				overmind_action_focus_tech = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 5 }
-				}
-				overmind_action_diplomacy = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 6 }
-				}
-				overmind_action_prepare_war = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 7 }
-				}
-				overmind_action_defend = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 8 }
-				}
-				overmind_action_consolidate = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 9 }
-				}
-				overmind_action_colonize = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 10 }
-				}
-				overmind_action_build_starbase = yes
-			}
-			else_if = {
-				limit = {
-					check_variable = { which = overmind_action value = 11 }
-				}
-				overmind_action_espionage = yes
-			}
-
-			# Clear the directive flag
-			remove_global_flag = overmind_directive_ready
-			set_variable = { which = overmind_action value = 0 }
-
-			log = "[OVERMIND] Directive executed"
+			overmind_action_expand = yes
 		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 2 }
+			}
+			overmind_action_build_fleet = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 3 }
+			}
+			overmind_action_improve_economy = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 4 }
+			}
+			overmind_action_focus_tech = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 5 }
+			}
+			overmind_action_diplomacy = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 6 }
+			}
+			overmind_action_prepare_war = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 7 }
+			}
+			overmind_action_defend = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 8 }
+			}
+			overmind_action_consolidate = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 9 }
+			}
+			overmind_action_colonize = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 10 }
+			}
+			overmind_action_build_starbase = yes
+		}
+		else_if = {
+			limit = {
+				check_variable = { which = overmind_action value = 11 }
+			}
+			overmind_action_espionage = yes
+		}
+
+		# Clear the per-country directive flag and variable
+		remove_country_flag = overmind_directive_ready
+		set_variable = { which = overmind_action value = 0 }
+
+		log = "[OVERMIND] Directive executed for [This.GetName]"
 	}
 }

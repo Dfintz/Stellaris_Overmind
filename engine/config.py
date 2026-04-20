@@ -31,6 +31,19 @@ class LLMConfig:
     timeout_s: float = 30.0
     api_key: str = ""
 
+    # Hybrid / online mode
+    mode: str = "local"                       # local | online | hybrid
+    online_base_url: str = ""                 # e.g. https://openrouter.ai/api/v1
+    online_model: str = ""                    # e.g. qwen/qwen-2.5-72b-instruct
+    online_api_key: str = ""
+    online_max_tokens: int = 256
+    online_temperature: float = 0.3
+    online_timeout_s: float = 60.0
+
+    # Prompt optimization
+    compact_json: bool = True                 # minified JSON in prompts
+    prompt_cache: bool = True                 # cache static prompt prefixes
+
 
 @dataclass
 class StellarisConfig:
@@ -56,13 +69,68 @@ class BridgePathConfig:
 
 @dataclass
 class EmpireStartConfig:
-    """Empire definition loaded at startup."""
+    """Empire definition loaded at startup.
+
+    In ``player`` mode this defines the player's empire.
+    In ``ai`` mode this is ignored — empires are auto-detected from the save.
+    """
 
     ethics: list[str] = field(default_factory=lambda: ["Militarist", "Materialist"])
     civics: list[str] = field(default_factory=lambda: ["Technocracy"])
     traits: list[str] = field(default_factory=lambda: ["Intelligent"])
     origin: str = "Prosperous Unification"
     government: str = "Oligarchy"
+
+
+@dataclass
+class TargetConfig:
+    """Which empires the Overmind controls.
+
+    Modes:
+      - ``player`` — control the human player's empire (default)
+      - ``ai``     — control AI empires (replace Stellaris' built-in AI)
+    """
+
+    mode: str = "player"                    # "player" | "ai"
+    ai_country_ids: list[int] = field(default_factory=list)  # empty = all AI
+    ai_exclude_ids: list[int] = field(default_factory=list)  # skip these AIs
+    ai_exclude_fallen: bool = True          # skip Fallen Empires by default
+
+
+@dataclass
+class MultiAgentConfig:
+    """Multi-agent council configuration."""
+
+    enabled: bool = False
+    parallel: bool = True
+    arbiter_uses_llm: bool = True
+
+
+@dataclass
+class PlannerConfig:
+    """Strategic planner configuration."""
+
+    enabled: bool = False
+    provider: str = "same"           # "same" = use main LLM provider
+    base_url: str = ""               # only if provider != "same"
+    model: str = ""                  # only if provider != "same"
+    interval_years: int = 5          # how often to re-plan
+    max_tokens: int = 512            # planner gets more room than sub-agents
+    temperature: float = 0.4
+
+
+@dataclass
+class TrainingConfig:
+    """Training pipeline configuration."""
+
+    replay_dir: str = "training/replay_buffer"
+    sft_threshold: float = 0.3              # min composite score for SFT data
+    dpo_margin: float = 0.2                 # min score gap for DPO pairs
+    teacher_model: str = ""                 # e.g. qwen/qwen-2.5-72b-instruct
+    teacher_base_url: str = ""              # e.g. https://openrouter.ai/api/v1
+    teacher_api_key: str = ""               # API key for teacher endpoint
+    quantize_method: str = "gptq"           # gptq | awq
+    quantize_bits: int = 4
 
 
 @dataclass
@@ -73,6 +141,10 @@ class OvermindConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     bridge: BridgePathConfig = field(default_factory=BridgePathConfig)
     empire: EmpireStartConfig = field(default_factory=EmpireStartConfig)
+    target: TargetConfig = field(default_factory=TargetConfig)
+    multi_agent: MultiAgentConfig = field(default_factory=MultiAgentConfig)
+    planner: PlannerConfig = field(default_factory=PlannerConfig)
+    training: TrainingConfig = field(default_factory=TrainingConfig)
     log_level: str = "INFO"
     max_retries: int = 2
 
@@ -124,6 +196,21 @@ def _load_toml(path: Path, cfg: OvermindConfig) -> OvermindConfig:
         cfg.llm.max_tokens = llm.get("max_tokens", cfg.llm.max_tokens)
         cfg.llm.temperature = llm.get("temperature", cfg.llm.temperature)
         cfg.llm.timeout_s = llm.get("timeout_s", cfg.llm.timeout_s)
+        cfg.llm.mode = llm.get("mode", cfg.llm.mode)
+        cfg.llm.compact_json = llm.get("compact_json", cfg.llm.compact_json)
+        cfg.llm.prompt_cache = llm.get("prompt_cache", cfg.llm.prompt_cache)
+
+        # Online sub-section
+        if "online" in llm:
+            ol = llm["online"]
+            cfg.llm.online_base_url = ol.get("base_url", cfg.llm.online_base_url)
+            cfg.llm.online_model = ol.get("model", cfg.llm.online_model)
+            cfg.llm.online_api_key = ol.get("api_key", cfg.llm.online_api_key)
+            cfg.llm.online_max_tokens = ol.get("max_tokens", cfg.llm.online_max_tokens)
+            cfg.llm.online_temperature = ol.get(
+                "temperature", cfg.llm.online_temperature,
+            )
+            cfg.llm.online_timeout_s = ol.get("timeout_s", cfg.llm.online_timeout_s)
 
     # Bridge section
     if "bridge" in data:
@@ -145,6 +232,45 @@ def _load_toml(path: Path, cfg: OvermindConfig) -> OvermindConfig:
     cfg.log_level = data.get("log_level", cfg.log_level)
     cfg.max_retries = data.get("max_retries", cfg.max_retries)
 
+    # Target section
+    if "target" in data:
+        tgt = data["target"]
+        cfg.target.mode = tgt.get("mode", cfg.target.mode)
+        cfg.target.ai_country_ids = tgt.get("ai_country_ids", cfg.target.ai_country_ids)
+        cfg.target.ai_exclude_ids = tgt.get("ai_exclude_ids", cfg.target.ai_exclude_ids)
+        cfg.target.ai_exclude_fallen = tgt.get("ai_exclude_fallen", cfg.target.ai_exclude_fallen)
+
+    # Multi-agent section
+    if "multi_agent" in data:
+        ma = data["multi_agent"]
+        cfg.multi_agent.enabled = ma.get("enabled", cfg.multi_agent.enabled)
+        cfg.multi_agent.parallel = ma.get("parallel", cfg.multi_agent.parallel)
+        cfg.multi_agent.arbiter_uses_llm = ma.get(
+            "arbiter_uses_llm", cfg.multi_agent.arbiter_uses_llm,
+        )
+
+    # Planner section
+    if "planner" in data:
+        pl = data["planner"]
+        cfg.planner.enabled = pl.get("enabled", cfg.planner.enabled)
+        cfg.planner.provider = pl.get("provider", cfg.planner.provider)
+        cfg.planner.base_url = pl.get("base_url", cfg.planner.base_url)
+        cfg.planner.model = pl.get("model", cfg.planner.model)
+        cfg.planner.interval_years = pl.get("interval_years", cfg.planner.interval_years)
+        cfg.planner.max_tokens = pl.get("max_tokens", cfg.planner.max_tokens)
+        cfg.planner.temperature = pl.get("temperature", cfg.planner.temperature)
+
+    # Training section
+    if "training" in data:
+        tr = data["training"]
+        cfg.training.replay_dir = tr.get("replay_dir", cfg.training.replay_dir)
+        cfg.training.sft_threshold = tr.get("sft_threshold", cfg.training.sft_threshold)
+        cfg.training.dpo_margin = tr.get("dpo_margin", cfg.training.dpo_margin)
+        cfg.training.teacher_model = tr.get("teacher_model", cfg.training.teacher_model)
+        cfg.training.teacher_base_url = tr.get("teacher_base_url", cfg.training.teacher_base_url)
+        cfg.training.quantize_method = tr.get("quantize_method", cfg.training.quantize_method)
+        cfg.training.quantize_bits = tr.get("quantize_bits", cfg.training.quantize_bits)
+
     log.info("Loaded config from %s", path)
     return cfg
 
@@ -159,6 +285,10 @@ def _apply_env_overrides(cfg: OvermindConfig) -> None:
         cfg.llm.model = v
     if v := os.environ.get("OVERMIND_LLM_API_KEY"):
         cfg.llm.api_key = v
+    if v := os.environ.get("OVERMIND_LLM_ONLINE_API_KEY"):
+        cfg.llm.online_api_key = v
+    if v := os.environ.get("OVERMIND_LLM_MODE"):
+        cfg.llm.mode = v
     if v := os.environ.get("OVERMIND_BRIDGE_DIR"):
         cfg.bridge.bridge_dir = v
     if v := os.environ.get("OVERMIND_LOG_LEVEL"):

@@ -31,7 +31,6 @@ import argparse
 import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +62,10 @@ class FineTuneConfig:
     use_qlora: bool = False
     bnb_4bit_compute_dtype: str = "bfloat16"
     bnb_4bit_quant_type: str = "nf4"
+
+    # Integrations
+    use_wandb: bool = False            # log to Weights & Biases
+    use_unsloth: bool = False          # use Unsloth for 2x faster training
 
 
 def run_sft(data_path: str, config: FineTuneConfig) -> None:
@@ -141,7 +144,7 @@ def run_sft(data_path: str, config: FineTuneConfig) -> None:
         bf16=config.bf16,
         logging_steps=10,
         save_strategy="epoch",
-        report_to="none",
+        report_to="wandb" if config.use_wandb else "none",
     )
 
     trainer = SFTTrainer(
