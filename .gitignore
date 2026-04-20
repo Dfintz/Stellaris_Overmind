@@ -9,12 +9,20 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+*.egg-info/
+dist/
+build/
 
 # Training data (large files)
 training/replay_buffer/
 training/sft_data/
 training/dpo_pairs/
 models/
+
+# Runtime artifacts (written by engine)
+ai_commands.txt
+directive*.json
+overmind_suggestion.txt
 
 # Stellaris bridge files (written at runtime)
 mod/stellaris_overmind/ai_bridge/state_snapshot.json

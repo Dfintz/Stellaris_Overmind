@@ -1,6 +1,6 @@
 param(
     [string]$StellarisUserDir = "",
-    [string]$StellarisInstallDir = "G:\SteamLibrary\steamapps\common\Stellaris",
+    [string]$StellarisInstallDir = "",
     [switch]$SkipPython
 )
 
@@ -61,8 +61,8 @@ $configTarget = Join-Path $projectRoot "config.toml"
 $configSource = Join-Path $projectRoot "config.example.toml"
 if (-not (Test-Path $configTarget)) {
     $c = Get-Content $configSource -Raw
-    $c = $c -replace [regex]::Escape("C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris"), ($StellarisUserDir -replace '\\','/')
-    $c = $c -replace [regex]::Escape("G:/SteamLibrary/steamapps/common/Stellaris"), ($StellarisInstallDir -replace '\\','/')
+    $c = $c -replace [regex]::Escape("C:/Users/YOUR_USER/Documents/Paradox Interactive/Stellaris"), ($StellarisUserDir -replace '\\','/')
+    $c = $c -replace [regex]::Escape("C:/Program Files (x86)/Steam/steamapps/common/Stellaris"), ($StellarisInstallDir -replace '\\','/')
     Set-Content $configTarget -Value $c -Encoding UTF8 -NoNewline
     Write-Host "  Created config.toml"
 } else {

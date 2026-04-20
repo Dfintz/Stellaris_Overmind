@@ -189,8 +189,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--stellaris-dir", type=Path,
-        default=Path("C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris"),
-        help="Stellaris user data directory",
+        default=None,
+        help="Stellaris user data directory (auto-detected if not set)",
     )
     parser.add_argument(
         "--poll", type=float, default=2.0,
@@ -204,11 +204,25 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
 
-    if not args.stellaris_dir.exists():
-        log.error("Stellaris directory not found: %s", args.stellaris_dir)
+    stellaris_dir = args.stellaris_dir
+    if stellaris_dir is None:
+        # Auto-detect common Stellaris user data paths
+        for candidate in [
+            Path.home() / "OneDrive/Documents/Paradox Interactive/Stellaris",
+            Path.home() / "Documents/Paradox Interactive/Stellaris",
+        ]:
+            if candidate.exists():
+                stellaris_dir = candidate
+                break
+        if stellaris_dir is None:
+            log.error("Cannot find Stellaris directory. Use --stellaris-dir.")
+            raise SystemExit(1)
+
+    if not stellaris_dir.exists():
+        log.error("Stellaris directory not found: %s", stellaris_dir)
         raise SystemExit(1)
 
-    watch_and_execute(args.stellaris_dir, args.poll)
+    watch_and_execute(stellaris_dir, args.poll)
 
 
 if __name__ == "__main__":

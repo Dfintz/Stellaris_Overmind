@@ -6,12 +6,13 @@ max_retries = 2
 
 [stellaris]
 # Stellaris installation directory (Steam)
-install_dir = "G:/SteamLibrary/steamapps/common/Stellaris"
+# Windows: typically "C:/Program Files (x86)/Steam/steamapps/common/Stellaris"
+install_dir = "C:/Program Files (x86)/Steam/steamapps/common/Stellaris"
 
 # Stellaris user data directory (where mods, saves, and logs live)
-# Windows: typically Documents/Paradox Interactive/Stellaris
+# Windows: typically ~/Documents/Paradox Interactive/Stellaris
 # If using OneDrive: ~/OneDrive/Documents/Paradox Interactive/Stellaris
-user_data_dir = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris"
+user_data_dir = "C:/Users/YOUR_USER/Documents/Paradox Interactive/Stellaris"
 
 # Mod name (folder inside user_data_dir/mod/)
 mod_name = "stellaris_overmind"
@@ -64,14 +65,14 @@ prompt_cache = true
 # Autosave directory — the engine watches this for new .sav files.
 # If this directory exists, the engine uses autosave mode (recommended).
 # No Clausewitz state exporter mod is needed in this mode.
-save_dir = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/save games"
+save_dir = "C:/Users/YOUR_USER/Documents/Paradox Interactive/Stellaris/save games"
 
 # Player name — auto-detected from the save file if left empty.
 # Set this if auto-detection picks the wrong empire.
 # player_name = ""
 
 # Directive output directory — the Clausewitz mod reads directives from here.
-bridge_dir = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge"
+bridge_dir = "C:/Users/YOUR_USER/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge"
 
 # How often to check for new saves (seconds)
 poll_interval_s = 2.0

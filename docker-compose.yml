@@ -71,8 +71,8 @@ services:
         condition: service_healthy
     volumes:
       # Bridge directory — must point to the Stellaris mod's ai_bridge folder
-      # Default: your Stellaris mod dir (OneDrive/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge)
-      - ${BRIDGE_DIR:-C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge}:/app/mod/ai_bridge
+      # Set BRIDGE_DIR in .env or override here with your Stellaris mod path
+      - ${BRIDGE_DIR}:/app/mod/ai_bridge
       # Config
       - ./config.toml:/app/config.toml:ro
     environment:

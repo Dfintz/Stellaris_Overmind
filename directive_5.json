@@ -1,8 +1,0 @@
-{
-  "action": "CONSOLIDATE",
-  "country_id": 5,
-  "parameters": {},
-  "reason": "No LLM connected; defaulting to safe posture per 4.3 meta (stability is scarce, consolidate first).",
-  "target": null,
-  "timestamp": "2220.1"
-}

@@ -49,8 +49,8 @@ class LLMConfig:
 class StellarisConfig:
     """Stellaris installation paths."""
 
-    install_dir: str = "G:/SteamLibrary/steamapps/common/Stellaris"
-    user_data_dir: str = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris"
+    install_dir: str = ""
+    user_data_dir: str = ""
     mod_name: str = "stellaris_overmind"
 
 
@@ -59,11 +59,11 @@ class BridgePathConfig:
     """File bridge paths."""
 
     # Autosave directory (enables autosave mode if it exists)
-    save_dir: str = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/save games"
+    save_dir: str = ""
     player_name: str = ""  # auto-detected from save if empty
 
     # Directive output directory (mod reads this)
-    bridge_dir: str = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/mod/stellaris_overmind/ai_bridge"
+    bridge_dir: str = ""
     poll_interval_s: float = 2.0
 
 
