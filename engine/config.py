@@ -25,7 +25,7 @@ class LLMConfig:
 
     provider: str = "qwen-vllm"  # qwen-vllm | openai-compat | stub
     base_url: str = "http://localhost:8000"
-    model: str = "Qwen/Qwen2.5-Omni-7B"
+    model: str = "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4"
     max_tokens: int = 256
     temperature: float = 0.3
     timeout_s: float = 30.0

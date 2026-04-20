@@ -27,10 +27,10 @@ mode = "local"
 base_url = "http://localhost:8000"
 
 # Model ID as registered in vLLM
-# For 7B (needs ~32GB VRAM): "Qwen/Qwen2.5-Omni-7B"
-# For 3B (needs ~18GB VRAM): "Qwen/Qwen2.5-Omni-3B"
-# For GPTQ-Int4 (~12GB VRAM): "Qwen/Qwen2.5-Omni-7B-GPTQ-Int4"
-model = "Qwen/Qwen2.5-Omni-3B"
+# For 7B GPTQ-Int4 (~6GB VRAM, recommended): "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4"
+# For 7B full precision (~16GB VRAM): "Qwen/Qwen2.5-7B-Instruct"
+# For 3B (~7GB VRAM): "Qwen/Qwen2.5-3B-Instruct"
+model = "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4"
 
 max_tokens = 256
 temperature = 0.3

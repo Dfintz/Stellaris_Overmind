@@ -17,16 +17,16 @@
 #   docker compose --profile tensorrt up -d
 #
 # Prerequisites:
-#   - NVIDIA GPU with ≥18GB VRAM (3B) or ≥32GB (7B)
+#   - NVIDIA GPU with ≥6GB VRAM (7B-GPTQ) or ≥16GB (7B bf16)
 #   - nvidia-container-toolkit installed
 #   - Model downloaded to ./models/ or specify HF model ID
 
 services:
   # ------------------------------------------------------------------ #
-  # Qwen2.5-Omni served via vLLM (OpenAI-compat API)
+  # Qwen2.5 Instruct served via vLLM (OpenAI-compat API)
   # ------------------------------------------------------------------ #
   qwen:
-    image: qwenllm/qwen-omni:2.5-cu121
+    image: vllm/vllm-openai:latest
     container_name: overmind-qwen
     restart: unless-stopped
     deploy:
@@ -44,13 +44,13 @@ services:
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
     command: >
-      vllm serve ${QWEN_MODEL:-Qwen/Qwen2.5-Omni-3B}
+      --model ${QWEN_MODEL:-Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4}
       --port 8000
       --host 0.0.0.0
-      --dtype bfloat16
+      --dtype float16
       --max-model-len 4096
+      --quantization gptq
       --enforce-eager
-      --thinker-only
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
