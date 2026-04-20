@@ -1,0 +1,11 @@
+# Overmind directive: CONSOLIDATE
+# Reason: No LLM connected; defaulting to safe posture per 4.3 meta (stability is scarce, 
+
+# --- Mod flags (personality + modifier) ---
+effect set_variable = { which = overmind_action value = 8 }
+effect set_country_flag = overmind_directive_ready
+
+# --- Direct effects: CONSOLIDATE ---
+# Stabilize economy
+effect add_resource = { energy = 100 minerals = 100 }
+effect add_modifier = { modifier = overmind_consolidation days = 180 }

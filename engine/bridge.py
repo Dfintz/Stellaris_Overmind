@@ -210,14 +210,9 @@ class BridgeWriter:
     def write_console_commands(self, directive: dict, stellaris_dir: Path | None = None) -> None:
         """Write ``ai_commands.txt`` with console effects for this directive.
 
-        Stellaris can execute this via ``run ai_commands.txt`` in the console.
-        The file is written to the Stellaris user data directory so the
-        ``run`` command can find it.
-
-        Action code mapping matches overmind_events.txt:
-          1=EXPAND 2=BUILD_FLEET 3=IMPROVE_ECONOMY 4=FOCUS_TECH
-          5=DIPLOMACY 6=PREPARE_WAR 7=DEFEND 8=CONSOLIDATE
-          9=COLONIZE 10=BUILD_STARBASE 11=ESPIONAGE
+        Generates both the mod flag commands AND direct Clausewitz effects
+        that execute real actions (build ships, research tech, build buildings,
+        adopt traditions, etc.) so the player sees immediate results.
         """
         action_codes = {
             "EXPAND": 1, "BUILD_FLEET": 2, "IMPROVE_ECONOMY": 3,
@@ -230,19 +225,231 @@ class BridgeWriter:
 
         commands = [
             f"# Overmind directive: {action}",
+            f"# Reason: {directive.get('reason', 'N/A')[:80]}",
+            "",
+            "# --- Mod flags (personality + modifier) ---",
             f"effect set_variable = {{ which = overmind_action value = {code} }}",
             "effect set_country_flag = overmind_directive_ready",
         ]
+
+        # --- Direct effects per action ---
+        commands.append("")
+        commands.append(f"# --- Direct effects: {action} ---")
+
+        if action == "BUILD_FLEET":
+            commands.extend([
+                "# Build corvettes at all shipyards",
+                "effect every_owned_planet = {",
+                "    limit = { has_starport_size >= starbase_level_starport }",
+                "    planet_event = { id = overmind.100 }",
+                "}",
+                "# Queue ship construction via resource boost",
+                "effect add_resource = { alloys = 200 }",
+                "effect country_event = { id = overmind.100 }",
+            ])
+
+        elif action == "IMPROVE_ECONOMY":
+            commands.extend([
+                "# Build mining/generator districts on planets with free slots",
+                "effect every_owned_planet = {",
+                "    limit = { free_district_slots > 0 num_districts = { type = district_mining value < 10 } }",
+                "    add_district = district_mining",
+                "}",
+                "effect every_owned_planet = {",
+                "    limit = { free_district_slots > 0 num_districts = { type = district_generator value < 10 } }",
+                "    add_district = district_generator",
+                "}",
+                "# Build alloy foundry on capital if possible",
+                "effect capital_scope = {",
+                "    if = {",
+                "        limit = { free_building_slots > 0 }",
+                "        add_building = building_foundry_1",
+                "    }",
+                "}",
+            ])
+
+        elif action == "FOCUS_TECH":
+            commands.extend([
+                "# Build research districts/labs",
+                "effect every_owned_planet = {",
+                "    limit = { free_district_slots > 0 }",
+                "    add_district = district_generator",
+                "}",
+                "effect capital_scope = {",
+                "    if = {",
+                "        limit = { free_building_slots > 0 }",
+                "        add_building = building_research_lab_1",
+                "    }",
+                "}",
+                "# Boost research output",
+                "effect add_modifier = { modifier = overmind_research_focus days = 180 }",
+            ])
+
+        elif action == "EXPAND":
+            commands.extend([
+                "# Boost influence for expansion",
+                "effect add_resource = { influence = 50 }",
+                "effect add_modifier = { modifier = overmind_expansion_focus days = 180 }",
+            ])
+
+        elif action == "COLONIZE":
+            commands.extend([
+                "# Boost colony development",
+                "effect add_resource = { food = 200 }",
+                "effect add_modifier = { modifier = overmind_colonize_focus days = 180 }",
+            ])
+
+        elif action == "PREPARE_WAR":
+            commands.extend([
+                "# War economy: boost alloys",
+                "effect add_resource = { alloys = 300 }",
+                "effect add_modifier = { modifier = overmind_war_preparation days = 360 }",
+            ])
+
+        elif action == "DEFEND":
+            commands.extend([
+                "# Reinforce starbases",
+                "effect add_modifier = { modifier = overmind_defense_focus days = 180 }",
+            ])
+
+        elif action == "CONSOLIDATE":
+            commands.extend([
+                "# Stabilize economy",
+                "effect add_resource = { energy = 100 minerals = 100 }",
+                "effect add_modifier = { modifier = overmind_consolidation days = 180 }",
+            ])
+
+        elif action == "BUILD_STARBASE":
+            commands.extend([
+                "# Starbase upgrade resources",
+                "effect add_resource = { alloys = 150 influence = 25 }",
+                "effect add_modifier = { modifier = overmind_starbase_focus days = 180 }",
+            ])
+
+        elif action == "DIPLOMACY":
+            commands.extend([
+                "# Diplomatic weight boost",
+                "effect add_modifier = { modifier = overmind_diplomacy_focus days = 180 }",
+            ])
+
+        elif action == "ESPIONAGE":
+            commands.extend([
+                "# Espionage boost",
+                "effect add_modifier = { modifier = overmind_espionage_focus days = 180 }",
+            ])
 
         # Write to Stellaris user data dir (where `run` looks for files)
         if stellaris_dir and stellaris_dir.exists():
             cmd_path = stellaris_dir / "ai_commands.txt"
         else:
-            # Fallback: write next to the directive
             cmd_path = self._config.bridge_dir / "ai_commands.txt"
 
         cmd_path.write_text("\n".join(commands), encoding="utf-8")
         log.info("Wrote console commands: %s → %s (code %d)", action, cmd_path, code)
+
+    def write_suggestion(self, directive: dict, stellaris_dir: Path | None = None) -> None:
+        """Write a human-readable suggestion file for player mode.
+
+        Instead of executing actions, this shows the player what the
+        LLM recommends they should do next.
+        """
+        _SUGGESTION_TIPS = {
+            "EXPAND": [
+                "Build a starbase outpost in a nearby unclaimed system",
+                "Prioritize chokepoint systems for defense",
+                "Claim systems with rare resources first",
+            ],
+            "BUILD_FLEET": [
+                "Queue corvettes/destroyers at your shipyard",
+                "Use autocannon + plasma loadout (4.3 meta)",
+                "Fill your naval cap before upgrading ship designs",
+            ],
+            "IMPROVE_ECONOMY": [
+                "Build mining districts on mineral-rich planets",
+                "Build alloy foundries (alloys > consumer goods early)",
+                "Specialize planets with designations",
+            ],
+            "FOCUS_TECH": [
+                "Build research labs on your capital",
+                "Set Academic Privilege living standard",
+                "Prioritize alloy/mineral tech for early economy",
+            ],
+            "DIPLOMACY": [
+                "Send an envoy to improve relations with neighbors",
+                "Consider a research agreement or commercial pact",
+                "Set diplomatic stance to Cooperative",
+            ],
+            "PREPARE_WAR": [
+                "Move fleets to the border with your target",
+                "Stock up on alloys (aim for 1000+)",
+                "Set economic policy to Militarist",
+                "Claim target systems before declaring war",
+            ],
+            "DEFEND": [
+                "Consolidate fleets at chokepoint starbases",
+                "Upgrade starbases with gun batteries + hangars",
+                "Build defense platforms at key starbases",
+            ],
+            "CONSOLIDATE": [
+                "Fix any energy/food deficits first",
+                "Build amenity buildings on low-stability planets",
+                "Pause expansion until economy stabilizes",
+            ],
+            "COLONIZE": [
+                "Build a colony ship and send to the best available world",
+                "Prioritize size 20+ planets with good habitability",
+                "Void Dwellers: build habitats instead",
+            ],
+            "BUILD_STARBASE": [
+                "Upgrade a starbase at a chokepoint to starhold/fortress",
+                "Add anchorages for naval cap, or trade hubs for energy",
+                "Build shipyard modules for fleet production",
+            ],
+            "ESPIONAGE": [
+                "Build a spy network in a rival empire",
+                "Assign a high-level operative as spymaster",
+                "Gather intel before declaring war",
+            ],
+        }
+
+        action = directive.get("action", "CONSOLIDATE")
+        reason = directive.get("reason", "")
+        timestamp = directive.get("timestamp", "")
+        tips = _SUGGESTION_TIPS.get(action, ["Follow the LLM's recommendation"])
+
+        lines = [
+            "╔══════════════════════════════════════════════════════════╗",
+            f"║  OVERMIND SUGGESTS: {action:<38}║",
+            "╠══════════════════════════════════════════════════════════╣",
+            f"║  Year: {timestamp:<50}║",
+            "║                                                          ║",
+            f"║  Reason: {reason[:48]:<48}  ║",
+        ]
+        if len(reason) > 48:
+            lines.append(f"║          {reason[48:96]:<48}  ║")
+
+        lines.append("║                                                          ║")
+        lines.append("║  What to do:                                              ║")
+        for tip in tips:
+            lines.append(f"║   • {tip:<53}║")
+        lines.extend([
+            "║                                                          ║",
+            "╚══════════════════════════════════════════════════════════╝",
+        ])
+
+        suggestion_text = "\n".join(lines)
+
+        # Print to stdout for immediate visibility
+        print("\n" + suggestion_text + "\n")
+
+        # Also save to file
+        if stellaris_dir and stellaris_dir.exists():
+            path = stellaris_dir / "overmind_suggestion.txt"
+        else:
+            path = self._config.bridge_dir / "overmind_suggestion.txt"
+
+        path.write_text(suggestion_text, encoding="utf-8")
+        log.info("Suggestion: %s — %s", action, reason[:80])
 
     def write_directive_for(self, country_id: int, directive: dict) -> None:
         """Write a directive for a specific AI empire.

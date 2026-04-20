@@ -53,6 +53,7 @@ class LoopStats:
     snapshots_processed: int = 0
     last_decision_time_ms: float = 0.0
     last_action: str = ""
+    last_suggestion: str = ""
 
 
 class GameLoopController:
@@ -299,7 +300,7 @@ class GameLoopController:
         return directive
 
     def _emit_directive(self, directive: Directive, state: dict) -> None:
-        """Write the directive to the bridge for the mod to consume."""
+        """Write the directive to the bridge and display as a suggestion."""
         payload = directive.to_dict()
         payload["timestamp"] = f"{state.get('year', 0)}.{state.get('month', 0)}"
         payload["meta"] = {
@@ -309,11 +310,22 @@ class GameLoopController:
         }
         self._writer.write_directive(payload)
 
-        # Also write console commands for in-game execution
+        # Player mode: write human-readable suggestion (no direct execution)
         stellaris_dir = None
         if self._bridge_config.save_dir and self._bridge_config.save_dir.exists():
             stellaris_dir = self._bridge_config.save_dir.parent
-        self._writer.write_console_commands(payload, stellaris_dir)
+        self._writer.write_suggestion(payload, stellaris_dir)
+
+        # Store suggestion text for TUI display
+        action = directive.action
+        reason = directive.reason[:120]
+        self.stats.last_suggestion = f"[bold yellow]{action}[/bold yellow] — {reason}"
+
+        # Log the suggestion prominently
+        log.info(
+            ">>> SUGGESTION: %s — %s",
+            directive.action, directive.reason[:120],
+        )
 
     def _process_council(self, state: dict, event: str | None) -> Directive | None:
         """Run the multi-agent council pipeline on a state snapshot."""
@@ -569,7 +581,13 @@ class AILoopController:
     def _emit_and_record(
         self, country_id: int, directive: Directive | None, state: dict,
     ) -> None:
-        """Write directive to bridge and record for training."""
+        """Write directive to bridge and record for training.
+
+        AI empires rely on the mod's personality overrides and stat modifiers
+        to influence Stellaris's native AI — we do NOT issue direct console
+        commands (add_district, add_building, etc.) because that bypasses
+        the native build queues and economic planning.
+        """
         if directive is not None:
             payload = directive.to_dict()
             payload["country_id"] = country_id

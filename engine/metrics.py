@@ -51,6 +51,7 @@ class DashboardMetrics:
     planner_enabled: bool = False
     recording_enabled: bool = False
     game_year: int = 0
+    last_suggestion: str = ""
 
     def to_dict(self) -> dict:
         total_calls = self.local_calls + self.online_calls
@@ -108,6 +109,10 @@ class MetricsCollector:
         self._metrics.last_action = action
         self._metrics.last_latency_ms = latency_ms
 
+    def record_suggestion(self, text: str) -> None:
+        """Record a player-mode suggestion for display."""
+        self._metrics.last_suggestion = text
+
     def update_from_loop(self, loop_stats: object) -> None:
         """Pull stats from a LoopStats dataclass."""
         self._metrics.decisions_made = getattr(loop_stats, "decisions_made", 0)
@@ -117,6 +122,7 @@ class MetricsCollector:
         self._metrics.snapshots_processed = getattr(loop_stats, "snapshots_processed", 0)
         self._metrics.last_action = getattr(loop_stats, "last_action", "")
         self._metrics.last_latency_ms = getattr(loop_stats, "last_decision_time_ms", 0.0)
+        self._metrics.last_suggestion = getattr(loop_stats, "last_suggestion", "")
 
     def update_from_provider(self, provider_stats: object) -> None:
         """Pull stats from a ProviderStats dataclass (or dict)."""

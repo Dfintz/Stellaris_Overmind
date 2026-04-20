@@ -171,6 +171,15 @@ def run_console(
         log_lines = list(log_capture.records)
         log_text = "\n".join(log_lines[-15:]) if log_lines else "[dim]Waiting for events...[/dim]"
 
+        # Suggestion panel (player mode only)
+        suggestion_panel = None
+        if target_mode == "player" and m.last_suggestion:
+            suggestion_panel = Panel(
+                m.last_suggestion,
+                title="[bold yellow]Suggestion[/bold yellow]",
+                border_style="yellow",
+            )
+
         # Controls
         mode_display = console_config.llm_mode.upper()
         controls = Text.assemble(
@@ -192,13 +201,18 @@ def run_console(
 
         # Assemble layout
         layout = Layout()
-        layout.split_column(
+        panels = [
             Layout(Panel(header, style="bold"), size=3, name="header"),
             Layout(Panel(tok_table, title="Token Rates"), size=5, name="tokens"),
             Layout(Panel(dec_table, title="Decisions"), size=5, name="decisions"),
+        ]
+        if suggestion_panel is not None:
+            panels.append(Layout(suggestion_panel, size=8, name="suggestion"))
+        panels.extend([
             Layout(Panel(log_text, title="Log"), name="log"),
             Layout(Panel(controls), size=3, name="controls"),
-        )
+        ])
+        layout.split_column(*panels)
         return layout
 
     # Key input thread
