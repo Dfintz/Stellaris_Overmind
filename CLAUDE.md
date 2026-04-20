@@ -20,9 +20,11 @@ Read `docs/PROJECT_OVERVIEW.md` for the full project specification.
 
 ```
 docs/           Project specs, ruleset spec, meta, personality system, exporter/executor specs
-engine/         Python AI engine — ruleset generator, decision engine, personality shards, validator
-mod/            Clausewitz mod files — state exporter, action executor, event hooks
+engine/         Python AI engine — 20+ modules (multi-agent, planner, providers, metrics, console)
+mod/            Clausewitz mod files — events, effects, modifiers, AI personalities
 examples/       Sample rulesets, events, and decisions (JSON)
+training/       Model optimization — eval, curate, fine-tune, distill, quantize
+scripts/        Utilities — teacher collection, Foundry upload, auto-execute
 .claude/        Claude Code configuration and skills
 .github/        Copilot instructions and skills
 ```
@@ -34,10 +36,13 @@ examples/       Sample rulesets, events, and decisions (JSON)
 | Layer | Technology |
 |-------|-----------|
 | AI Engine | Python 3.11+, structured around pure functions and dataclasses |
-| LLM Interface | Pluggable `llm_callable(prompt: str) -> str` — no framework dependency |
-| Game Integration | Clausewitz engine scripting (Stellaris mod format) |
-| Data Exchange | JSON files in `mod/ai_bridge/` (state snapshots + directives) |
-| Testing | pytest |
+| LLM Interface | Pluggable `LLMProvider` ABC — local (vLLM/Ollama), online (OpenAI-compat), hybrid |
+| Game Integration | Clausewitz engine scripting + autosave parsing (no exporter mod needed) |
+| Data Exchange | JSON files in `mod/ai_bridge/` + `ai_commands.txt` console commands |
+| Multi-Agent | Council orchestrator with domain sub-agents + government-weighted arbitration |
+| Training | LoRA/QLoRA via HF/PEFT/TRL, GPTQ/AWQ quantization, wandb tracking |
+| Console | Rich TUI dashboard (optional) |
+| Testing | pytest (464 tests) |
 | Linting | ruff |
 | Type Checking | mypy (strict mode) |
 

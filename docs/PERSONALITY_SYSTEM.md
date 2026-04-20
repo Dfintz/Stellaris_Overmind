@@ -1,5 +1,6 @@
 ﻿# Stellaris 4.3.4 – Personality System
-Defines how the LLM simulates human‑like strategic behavior using personality shards.
+Defines how the LLM simulates human‑like strategic behavior using personality shards,
+multi-agent council, and Clausewitz AI personality overrides.
 
 ---
 
@@ -7,6 +8,7 @@ Defines how the LLM simulates human‑like strategic behavior using personality 
 - Give each empire a unique strategic identity.
 - Reflect ethics, civics, traits, origins, and government.
 - Enable adaptive, believable behavior.
+- Control Stellaris' built-in AI via native personality system.
 
 ---
 

@@ -77,13 +77,18 @@ bridge_dir = "C:/Users/Fintz/OneDrive/Documents/Paradox Interactive/Stellaris/mo
 poll_interval_s = 2.0
 
 [empire]
-# Your empire's setup — must match what you pick in the game launcher.
-# The AI will generate a ruleset from these.
-ethics = ["Fanatic Authoritarian", "Spiritualist"]
-civics = ["Corvée System", "Planet Forgers"]
-traits = ["Ingenious", "Industrious"]
-origin = "Cybernetic Creed"
-government = "Imperial"
+# Auto-detect: reads ethics/civics/origin/government from the save file.
+# No manual config needed — works with any empire.
+auto_detect = true
+
+# Manual override: set auto_detect = false and specify your empire.
+# Must match what you pick in the Stellaris launcher.
+# auto_detect = false
+# ethics = ["Fanatic Authoritarian", "Spiritualist"]
+# civics = ["Corvée System", "Planet Forgers"]
+# traits = ["Ingenious", "Industrious"]
+# origin = "Cybernetic Creed"
+# government = "Imperial"
 
 [target]
 # Which empires the Overmind controls.

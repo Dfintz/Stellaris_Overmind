@@ -131,6 +131,7 @@ BUILD_FLEET
 IMPROVE_ECONOMY
 FOCUS_TECH
 DIPLOMACY
+ESPIONAGE
 PREPARE_WAR
 DEFEND
 CONSOLIDATE
@@ -232,20 +233,119 @@ Ruleset must match game version:
     EXPORTER_SPEC.md
     EXECUTOR_SPEC.md
 
-/mod
-    (Clausewitz mod files)
-
 /engine
-    ruleset_generator.py
-    decision_engine.py
-    personality_shards.py
-    validator.py
+    main.py                 Entry point (--console, --provider)
+    game_loop.py            GameLoopController + AILoopController
+    multi_agent.py          Council orchestrator (domestic + military agents)
+    strategic_planner.py    Long-term strategic assessments
+    decision_engine.py      Single-agent prompt builder + parser
+    save_reader.py          Clausewitz .sav parser → state snapshots
+    bridge.py               Autosave watcher + directive writer + console commands
+    hybrid_provider.py      Local/online/hybrid LLM failover
+    llm_provider.py         Abstract LLM interface
+    qwen_provider.py        vLLM + OpenAI-compat providers
+    validator.py            Fog-of-war + whitelist + ruleset validation
+    personality_shards.py   Government-weighted personality profiles
+    ruleset_generator.py    Ethics/civics/traits/origin → ruleset
+    strategic_knowledge.py  Hardcoded game systems reference
+    config.py               All configuration dataclasses
+    metrics.py              Runtime metrics aggregator
+    console.py              Rich TUI dashboard
+    prompt_cache.py         Prompt prefix caching
+    scorer.py               Outcome scoring for training
+    recorder.py             Decision replay buffer
+    mcp_client.py           MCP server client (wiki, save analysis)
+
+/mod
+    stellaris_overmind/
+        events/             Monthly directive reader, player/AI init
+        common/
+            on_actions/     Monthly pulse, game start hooks
+            scripted_effects/  Action executor (11 actions)
+            static_modifiers/  Temporary modifier nudges
+            personalities/  4 AI personality variants
+        ai_bridge/          Directive JSON files
+
+/training
+    evaluate.py             6-scenario benchmark suite
+    curate.py               SFT + DPO dataset generation
+    fine_tune.py            LoRA/QLoRA training
+    distill.py              Teacher→student distillation
+    quantize.py             GPTQ/AWQ quantization
+
+/scripts
+    collect_teacher.py      Cloud teacher data collection
+    upload_to_foundry.py    Azure AI Foundry upload
+    auto_execute.py         Auto-send console commands to Stellaris
 
 /examples
     sample_rulesets/
     sample_events/
     sample_decisions/
+
+/tests
+    464 tests covering all engine modules
 ```
+
+---
+
+## **8. Extended Architecture (Implemented)**
+
+### **8.1 Multi-Agent Council**
+Optional council mode splits decisions into domain-specific sub-agents:
+- **Domestic Agent** (governor + scientist shards) → economy, tech, planets
+- **Military Agent** (admiral + general shards) → fleets, wars, borders
+
+An **arbiter** merges recommendations using government weights:
+- Imperial/Dictatorial → code-only (ruler picks highest confidence)
+- Democracy/Oligarchy → LLM arbiter (weighted vote)
+- Hive/Machine → unified (always highest confidence)
+
+### **8.2 Dual Mode**
+- **Player mode** → controls the human player's empire
+- **AI mode** → replaces Stellaris' built-in AI for selected empires
+
+AI mode auto-detects empires from the save file, generates per-empire
+rulesets, processes empires in parallel, and writes per-empire directives.
+
+### **8.3 Strategic Planner**
+Runs periodically (every N years or on phase transitions) to produce a
+long-term `StrategicContext` (threat level, economy health, priorities)
+injected into sub-agent prompts.
+
+### **8.4 Hybrid LLM Provider**
+Three modes: `local` (vLLM/Ollama), `online` (any OpenAI-compat API),
+`hybrid` (local with automatic cloud fallback).  Token usage tracked
+across both backends.
+
+### **8.5 Mod AI Personality System**
+Four Clausewitz personality variants with 4.3.4 weapon meta:
+- `overmind_controlled` — balanced (kinetic weapons, shields > armor)
+- `overmind_controlled_aggressive` — high aggression, dominator enabled
+- `overmind_controlled_defensive` — low aggression, diplomatic
+- `overmind_controlled_assault` — maximum combat_bravery (3.0)
+
+Each action sets personality stance flags that Stellaris reads natively.
+
+### **8.6 Policy Enforcement**
+Actions trigger policy changes via Clausewitz effects:
+- FOCUS_TECH → Academic Privilege living standard
+- PREPARE_WAR → Unrestricted Wars + Militarist economy
+- DIPLOMACY → Cooperative diplomatic stance
+- CONSOLIDATE → Civilian economic policy
+
+### **8.7 Training Pipeline**
+Full pipeline for creating a Stellaris-specific model:
+1. Live play → replay buffer (recorder)
+2. Curation → SFT + DPO datasets
+3. Teacher distillation (cloud 72B → local 3B/7B)
+4. LoRA/QLoRA fine-tuning (wandb, unsloth)
+5. GPTQ/AWQ quantization
+6. Eval benchmarks (6 scenarios)
+
+### **8.8 Console Dashboard**
+Rich TUI (`--console` flag) showing token rates, decision stats,
+scrolling log, keyboard controls (M=mode, C=council, P=planner, Q=quit).
 
 ---
 

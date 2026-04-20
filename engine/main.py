@@ -233,11 +233,15 @@ def main() -> None:
             planner_provider=planner_provider,
         )
 
+        auto_label = " (auto-detect)" if cfg.empire.auto_detect else ""
         log.info("=" * 60)
         log.info("  STELLARIS OVERMIND — Player Mode")
         log.info("  Provider : %s", provider.name)
         log.info("  LLM Mode : %s", cfg.llm.mode)
-        log.info("  Origin   : %s", empire.origin)
+        if cfg.empire.auto_detect:
+            log.info("  Empire   : auto-detect from save file")
+        else:
+            log.info("  Origin   : %s", empire.origin)
         log.info("  Bridge   : %s (%s)", bridge.bridge_dir, bridge.mode)
         log.info("  Council  : %s", "enabled" if cfg.multi_agent.enabled else "disabled")
         log.info("  Planner  : %s", "enabled" if cfg.planner.enabled else "disabled")

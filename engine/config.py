@@ -71,15 +71,19 @@ class BridgePathConfig:
 class EmpireStartConfig:
     """Empire definition loaded at startup.
 
-    In ``player`` mode this defines the player's empire.
-    In ``ai`` mode this is ignored — empires are auto-detected from the save.
+    If all fields are empty (``auto_detect = true``), the engine reads the
+    player's ethics/civics/origin/government from the first save file
+    automatically — no manual config needed.
+
+    In ``ai`` mode this is always ignored — empires are auto-detected.
     """
 
-    ethics: list[str] = field(default_factory=lambda: ["Militarist", "Materialist"])
-    civics: list[str] = field(default_factory=lambda: ["Technocracy"])
-    traits: list[str] = field(default_factory=lambda: ["Intelligent"])
-    origin: str = "Prosperous Unification"
-    government: str = "Oligarchy"
+    auto_detect: bool = True
+    ethics: list[str] = field(default_factory=list)
+    civics: list[str] = field(default_factory=list)
+    traits: list[str] = field(default_factory=list)
+    origin: str = ""
+    government: str = ""
 
 
 @dataclass
@@ -223,11 +227,15 @@ def _load_toml(path: Path, cfg: OvermindConfig) -> OvermindConfig:
     # Empire section
     if "empire" in data:
         emp = data["empire"]
+        cfg.empire.auto_detect = emp.get("auto_detect", cfg.empire.auto_detect)
         cfg.empire.ethics = emp.get("ethics", cfg.empire.ethics)
         cfg.empire.civics = emp.get("civics", cfg.empire.civics)
         cfg.empire.traits = emp.get("traits", cfg.empire.traits)
         cfg.empire.origin = emp.get("origin", cfg.empire.origin)
         cfg.empire.government = emp.get("government", cfg.empire.government)
+        # If any field is set, disable auto-detect
+        if cfg.empire.ethics or cfg.empire.origin:
+            cfg.empire.auto_detect = emp.get("auto_detect", False)
 
     cfg.log_level = data.get("log_level", cfg.log_level)
     cfg.max_retries = data.get("max_retries", cfg.max_retries)

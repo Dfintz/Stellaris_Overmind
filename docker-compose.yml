@@ -49,7 +49,6 @@ services:
       --host 0.0.0.0
       --dtype float16
       --max-model-len 4096
-      --quantization gptq
       --enforce-eager
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

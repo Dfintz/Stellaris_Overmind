@@ -207,6 +207,43 @@ class BridgeWriter:
         if self._directive_path.exists():
             self._directive_path.unlink()
 
+    def write_console_commands(self, directive: dict, stellaris_dir: Path | None = None) -> None:
+        """Write ``ai_commands.txt`` with console effects for this directive.
+
+        Stellaris can execute this via ``run ai_commands.txt`` in the console.
+        The file is written to the Stellaris user data directory so the
+        ``run`` command can find it.
+
+        Action code mapping matches overmind_events.txt:
+          1=EXPAND 2=BUILD_FLEET 3=IMPROVE_ECONOMY 4=FOCUS_TECH
+          5=DIPLOMACY 6=PREPARE_WAR 7=DEFEND 8=CONSOLIDATE
+          9=COLONIZE 10=BUILD_STARBASE 11=ESPIONAGE
+        """
+        action_codes = {
+            "EXPAND": 1, "BUILD_FLEET": 2, "IMPROVE_ECONOMY": 3,
+            "FOCUS_TECH": 4, "DIPLOMACY": 5, "PREPARE_WAR": 6,
+            "DEFEND": 7, "CONSOLIDATE": 8, "COLONIZE": 9,
+            "BUILD_STARBASE": 10, "ESPIONAGE": 11,
+        }
+        action = directive.get("action", "CONSOLIDATE")
+        code = action_codes.get(action, 8)
+
+        commands = [
+            f"# Overmind directive: {action}",
+            f"effect set_variable = {{ which = overmind_action value = {code} }}",
+            "effect set_country_flag = overmind_directive_ready",
+        ]
+
+        # Write to Stellaris user data dir (where `run` looks for files)
+        if stellaris_dir and stellaris_dir.exists():
+            cmd_path = stellaris_dir / "ai_commands.txt"
+        else:
+            # Fallback: write next to the directive
+            cmd_path = self._config.bridge_dir / "ai_commands.txt"
+
+        cmd_path.write_text("\n".join(commands), encoding="utf-8")
+        log.info("Wrote console commands: %s → %s (code %d)", action, cmd_path, code)
+
     def write_directive_for(self, country_id: int, directive: dict) -> None:
         """Write a directive for a specific AI empire.
 

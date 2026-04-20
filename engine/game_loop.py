@@ -78,22 +78,29 @@ class GameLoopController:
         self._running = False
         self._recorder = recorder or GameRecorder()
         self.stats = LoopStats()
+        self._auto_detect = not empire.ethics  # empty = auto-detect from save
 
-        # Pre-compute static ruleset and personality (they don't change mid-game)
-        self._ruleset = generate_ruleset(
-            ethics=empire.ethics,
-            civics=empire.civics,
-            traits=empire.traits,
-            origin=empire.origin,
-            government=empire.government,
-        )
-        self._personality = build_personality(
-            ethics=empire.ethics,
-            civics=empire.civics,
-            traits=empire.traits,
-            origin=empire.origin,
-            government=empire.government,
-        )
+        if self._auto_detect:
+            # Deferred: will generate ruleset from first save snapshot
+            self._ruleset = {}
+            self._personality = {}
+            log.info("Empire auto-detect enabled — ruleset will be generated from first save")
+        else:
+            # Pre-compute static ruleset and personality
+            self._ruleset = generate_ruleset(
+                ethics=empire.ethics,
+                civics=empire.civics,
+                traits=empire.traits,
+                origin=empire.origin,
+                government=empire.government,
+            )
+            self._personality = build_personality(
+                ethics=empire.ethics,
+                civics=empire.civics,
+                traits=empire.traits,
+                origin=empire.origin,
+                government=empire.government,
+            )
 
         # Multi-agent council (opt-in)
         self._council = None
@@ -302,6 +309,12 @@ class GameLoopController:
         }
         self._writer.write_directive(payload)
 
+        # Also write console commands for in-game execution
+        stellaris_dir = None
+        if self._bridge_config.save_dir and self._bridge_config.save_dir.exists():
+            stellaris_dir = self._bridge_config.save_dir.parent
+        self._writer.write_console_commands(payload, stellaris_dir)
+
     def _process_council(self, state: dict, event: str | None) -> Directive | None:
         """Run the multi-agent council pipeline on a state snapshot."""
         strategic_context = None
@@ -350,48 +363,73 @@ class GameLoopController:
             self._planner.plan(state)
 
     def _maybe_refresh_ruleset(self, state: dict) -> None:
-        """Regenerate ruleset if the empire's ethics/civics changed mid-game."""
+        """Regenerate ruleset if the empire's ethics/civics changed mid-game.
+
+        On first call with auto-detect, generates the initial ruleset from
+        save data and updates the empire config to match.
+        """
         empire_info = state.get("empire", {})
         if not empire_info:
             return
 
         current_ethics = sorted(empire_info.get("ethics", []))
         current_civics = sorted(empire_info.get("civics", []))
-        config_ethics = sorted(self._empire.ethics)
-        config_civics = sorted(self._empire.civics)
+        current_origin = empire_info.get("origin", "")
+        current_gov = empire_info.get("government", "")
 
-        if current_ethics != config_ethics or current_civics != config_civics:
+        # Auto-detect: first snapshot populates the empire config
+        if self._auto_detect and not self._empire.ethics:
             log.info(
-                "Empire changed mid-game: ethics=%s civics=%s — regenerating ruleset",
-                current_ethics, current_civics,
+                "Auto-detected empire: ethics=%s civics=%s origin=%s gov=%s",
+                current_ethics, current_civics, current_origin, current_gov,
             )
-            self._ruleset = generate_ruleset(
-                ethics=current_ethics or self._empire.ethics,
-                civics=current_civics or self._empire.civics,
-                traits=self._empire.traits,
-                origin=empire_info.get("origin", self._empire.origin),
-                government=empire_info.get("government", self._empire.government),
+            self._empire.ethics = list(current_ethics)
+            self._empire.civics = list(current_civics)
+            self._empire.origin = current_origin
+            self._empire.government = current_gov
+            # Force regeneration below
+        else:
+            config_ethics = sorted(self._empire.ethics)
+            config_civics = sorted(self._empire.civics)
+            if current_ethics == config_ethics and current_civics == config_civics:
+                return  # no change
+
+        log.info(
+            "Empire changed: ethics=%s civics=%s — regenerating ruleset",
+            current_ethics, current_civics,
+        )
+        self._empire.ethics = list(current_ethics) or self._empire.ethics
+        self._empire.civics = list(current_civics) or self._empire.civics
+        self._empire.origin = current_origin or self._empire.origin
+        self._empire.government = current_gov or self._empire.government
+
+        self._ruleset = generate_ruleset(
+            ethics=self._empire.ethics,
+            civics=self._empire.civics,
+            traits=self._empire.traits,
+            origin=self._empire.origin,
+            government=self._empire.government,
+        )
+        self._personality = build_personality(
+            ethics=self._empire.ethics,
+            civics=self._empire.civics,
+            traits=self._empire.traits,
+            origin=self._empire.origin,
+            government=self._empire.government,
+        )
+        # Sync council with updated context
+        if self._council is not None:
+            self._council.update_context(
+                government=self._empire.government,
+                personality=self._personality,
+                ruleset=self._ruleset,
             )
-            self._personality = build_personality(
-                ethics=current_ethics or self._empire.ethics,
-                civics=current_civics or self._empire.civics,
-                traits=self._empire.traits,
-                origin=empire_info.get("origin", self._empire.origin),
-                government=empire_info.get("government", self._empire.government),
+        # Sync planner with updated context
+        if self._planner is not None:
+            self._planner.update_context(
+                ruleset=self._ruleset,
+                personality=self._personality,
             )
-            # Sync council with updated context
-            if self._council is not None:
-                self._council.update_context(
-                    government=empire_info.get("government", self._empire.government),
-                    personality=self._personality,
-                    ruleset=self._ruleset,
-                )
-            # Sync planner with updated context
-            if self._planner is not None:
-                self._planner.update_context(
-                    ruleset=self._ruleset,
-                    personality=self._personality,
-                )
 
 
 # ====================================================================== #
