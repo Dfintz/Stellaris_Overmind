@@ -1,15 +1,23 @@
 ﻿# Stellaris 4.3.4 – Action Executor Specification
-The executor applies LLM decisions inside the game via Clausewitz scripted effects,
-AI personality overrides, and automated policy enforcement.
+The executor influences Stellaris’ native AI via Clausewitz personality overrides, stat
+modifiers, and automated policy enforcement.  It does **not** bypass the native AI’s
+build queues, research picks, or fleet construction — those remain under native control.
+
+For the **player**, the engine acts as a strategic advisor: it displays suggestions
+in the Rich TUI and writes `overmind_suggestion.txt`, but never executes actions.
 
 ---
 
 ## 1. Purpose
-- Convert LLM macro actions into Clausewitz script actions.
+- Convert LLM macro actions into Clausewitz personality stance flags + stat modifiers.
 - Override AI personality (aggressiveness, weapon preferences, combat bravery) based on directive.
 - Enforce policies and edicts matching the strategic directive.
 - Prevent modifier stacking (clear all previous modifiers before each action).
 - Support per-country scoping for multi-empire AI mode.
+- In **player mode**, display human-readable suggestions (no direct execution).
+
+**Key principle**: the LLM decides *what* to prioritise; Stellaris’ native AI decides
+*how* to execute it (which districts to build, which techs to pick, etc.).
 
 ---
 
@@ -34,14 +42,26 @@ BUILD_STARBASE
 
 ## 3. Execution Pipeline
 
-### 3.1 Directive → Console Commands
-The Python engine writes `ai_commands.txt` to the Stellaris user data directory:
-```
-effect set_variable = { which = overmind_action value = N }
-effect set_country_flag = overmind_directive_ready
-```
+### 3.1 AI Mode: Directive → Personality Override
+The Python engine writes a directive JSON per AI country.
+The mod event reads the directive and:
+1. Clears all previous modifiers and stance flags (`overmind_clear_modifiers`)
+2. Sets the new personality stance flag (aggressive / defensive / full assault)
+3. Applies a temporary stat modifier (180 days) that nudges native AI priorities
+4. Enforces relevant policies (if available for the empire type)
 
-### 3.2 Mod Event (Monthly Pulse)
+Stellar’s native AI then uses these personality weights + modifiers to make its own
+micro-decisions (build order, research queue, fleet composition, colonisation order).
+
+### 3.2 Player Mode: Directive → Suggestion
+The engine writes `overmind_suggestion.txt` with:
+- The recommended action and reason
+- Specific tips for what the player should do (e.g. “Build research labs on your capital”)
+- Displayed prominently in the Rich TUI’s yellow “Suggestion” panel
+
+No console commands or mod effects are executed for the player.
+
+### 3.3 Mod Event (Monthly Pulse)
 Event `overmind.100` fires on `on_monthly_pulse_country`:
 1. Checks `has_country_flag = overmind_directive_ready` (per-country, not global)
 2. Reads `overmind_action` variable (country-scoped)
@@ -105,7 +125,8 @@ Reject actions if:
 ---
 
 ## 6. Execution Timing
-- Actions applied live (no pausing)
-- Console commands auto-written after each LLM decision
-- In-game: `run ai_commands.txt` or `scripts/auto_execute.py` for full automation
+- Personality overrides applied live via mod events (no pausing)
+- AI empires: directive JSON written per country; mod reads on monthly pulse
+- Player: suggestion displayed after each LLM decision (~3s with Ollama)
 - Cooldown: mod event fires monthly; engine polls every 2s for new saves
+- Empire config auto-detected from save file (no manual setup needed)

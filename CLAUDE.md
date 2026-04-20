@@ -38,11 +38,11 @@ scripts/        Utilities — teacher collection, Foundry upload, auto-execute
 | AI Engine | Python 3.11+, structured around pure functions and dataclasses |
 | LLM Interface | Pluggable `LLMProvider` ABC — local (vLLM/Ollama), online (OpenAI-compat), hybrid |
 | Game Integration | Clausewitz engine scripting + autosave parsing (no exporter mod needed) |
-| Data Exchange | JSON files in `mod/ai_bridge/` + `ai_commands.txt` console commands |
+| Data Exchange | JSON directive files in `mod/ai_bridge/` for AI mode; `overmind_suggestion.txt` for player mode |
 | Multi-Agent | Council orchestrator with domain sub-agents + government-weighted arbitration |
 | Training | LoRA/QLoRA via HF/PEFT/TRL, GPTQ/AWQ quantization, wandb tracking |
 | Console | Rich TUI dashboard (optional) |
-| Testing | pytest (464 tests) |
+| Testing | pytest (464+ tests) |
 | Linting | ruff |
 | Type Checking | mypy (strict mode) |
 
@@ -57,12 +57,20 @@ scripts/        Utilities — teacher collection, Foundry upload, auto-execute
 - See `docs/EXPORTER_SPEC.md` for intel-level filtering rules
 
 ### Allowed Actions (Whitelist)
-The LLM may only output one of these 10 actions:
+The LLM may only output one of these 11 actions:
 ```
-EXPAND, BUILD_FLEET, IMPROVE_ECONOMY, FOCUS_TECH, DIPLOMACY,
+EXPAND, BUILD_FLEET, IMPROVE_ECONOMY, FOCUS_TECH, DIPLOMACY, ESPIONAGE,
 PREPARE_WAR, DEFEND, CONSOLIDATE, COLONIZE, BUILD_STARBASE
 ```
 No free-form actions. The Validator rejects anything else.
+
+### Dual Mode Architecture
+- **Player mode** → displays strategic suggestions in the TUI + `overmind_suggestion.txt`;
+  the human decides and acts.  No direct game execution.
+- **AI mode** → steers Stellaris’ native AI via personality overrides + stat modifiers.
+  The LLM decides macro strategy (what to prioritise); native AI handles micro
+  (build queues, research picks, fleet composition, district placement).
+  Does **not** bypass native AI build queues with direct console commands.
 
 ### Ruleset Hierarchy (highest → lowest priority)
 1. **Origin Overrides** — hard rewrites (e.g., Void Dwellers: habitats only)

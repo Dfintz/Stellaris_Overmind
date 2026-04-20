@@ -20,13 +20,19 @@ The LLM is the *strategic brain*, not a replacement for Stellaris' micro‑AI.
 
 ### **2.1 Clausewitz Mod Layer (Game Integration)**
 Implements:
-- **State Exporter**
-  - Emits JSON snapshots of *known* information only
-  - Event‑driven (wars, borders, fleets, economy thresholds, colonization opportunities)
+- **State Exporter (Autosave Parser)**
+  - Parses `.sav` ZIP files → Clausewitz text → Python dicts
+  - Extracts *known* information only, filtered by intel level
+  - Event detection by comparing consecutive snapshots
 
-- **Action Executor**
-  - Reads LLM directives
-  - Applies macro actions (build fleets, colonize, change policies, move fleets, etc.)
+- **AI Personality Override (AI Mode)**
+  - Reads LLM directives → sets personality stance flags + stat modifiers
+  - Stellaris's native AI handles all micro (build queues, district placement, research, fleets)
+  - The LLM steers *what* the AI prioritises; native AI decides *how*
+
+- **Player Advisor (Player Mode)**
+  - Displays strategic suggestions in the Rich TUI and `overmind_suggestion.txt`
+  - Does NOT execute actions — the human player decides and acts
 
 - **Fog‑of‑War Enforcement**
   - Exporter must never reveal hidden or unknown data
@@ -139,7 +145,7 @@ COLONIZE
 BUILD_STARBASE
 ```
 
-No free‑form actions.
+11 allowed actions.  No free‑form actions.
 
 ### **4.2 Decision Frequency**
 - Every **3–12 in‑game months**, OR
@@ -284,7 +290,7 @@ Ruleset must match game version:
     sample_decisions/
 
 /tests
-    464 tests covering all engine modules
+    464+ tests covering all engine modules
 ```
 
 ---
@@ -302,11 +308,15 @@ An **arbiter** merges recommendations using government weights:
 - Hive/Machine → unified (always highest confidence)
 
 ### **8.2 Dual Mode**
-- **Player mode** → controls the human player's empire
-- **AI mode** → replaces Stellaris' built-in AI for selected empires
+- **Player mode** → acts as a strategic advisor, showing suggestions in the TUI
+  (the human decides and acts; no direct game execution)
+- **AI mode** → steers Stellaris' built-in AI via personality overrides + stat modifiers
+  (native AI keeps control of build queues, research picks, fleet construction)
 
 AI mode auto-detects empires from the save file, generates per-empire
 rulesets, processes empires in parallel, and writes per-empire directives.
+Empire config is auto-detected from the save file (ethics, civics, origin,
+government) — no manual configuration required.
 
 ### **8.3 Strategic Planner**
 Runs periodically (every N years or on phase transitions) to produce a

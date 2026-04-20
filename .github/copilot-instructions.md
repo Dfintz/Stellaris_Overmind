@@ -21,8 +21,8 @@ and makes macro-strategic decisions like a strong human player — live, without
 1. **Fog-of-War Compliance** — Never expose hidden game data to the LLM. The State Exporter
    filters by intel level. The Validator rejects any directive referencing unseen information.
 
-2. **Action Whitelist** — The LLM may only choose from 10 allowed actions:
-   `EXPAND`, `BUILD_FLEET`, `IMPROVE_ECONOMY`, `FOCUS_TECH`, `DIPLOMACY`,
+2. **Action Whitelist** — The LLM may only choose from 11 allowed actions:
+   `EXPAND`, `BUILD_FLEET`, `IMPROVE_ECONOMY`, `FOCUS_TECH`, `DIPLOMACY`, `ESPIONAGE`,
    `PREPARE_WAR`, `DEFEND`, `CONSOLIDATE`, `COLONIZE`, `BUILD_STARBASE`.
 
 3. **Version Lock** — All mechanics, rulesets, and meta must match Stellaris `4.3.4`.
@@ -34,6 +34,10 @@ and makes macro-strategic decisions like a strong human player — live, without
 5. **Meta is Curated** — The LLM applies meta; it does not invent meta.
    All meta entries in `docs/META_4.3.4.md` are tested in real 4.3.4 gameplay.
 
+6. **Dual Mode** — Player mode shows suggestions only (no direct execution).
+   AI mode steers native AI via personality overrides + stat modifiers
+   (no build queue bypass).
+
 ---
 
 ## Repository Layout
@@ -41,7 +45,7 @@ and makes macro-strategic decisions like a strong human player — live, without
 | Directory | Purpose |
 |-----------|---------|
 | `docs/` | Project specs, ruleset spec, meta, personality system, exporter/executor specs |
-| `engine/` | Python AI engine: `ruleset_generator.py`, `decision_engine.py`, `personality_shards.py`, `validator.py` |
+| `engine/` | Python AI engine: 20+ modules (multi-agent, planner, providers, metrics, console) |
 | `mod/` | Clausewitz mod files: state exporter, action executor, event hooks |
 | `examples/` | Sample rulesets, events, and decisions (JSON) |
 

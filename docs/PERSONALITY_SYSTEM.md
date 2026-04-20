@@ -2,6 +2,13 @@
 Defines how the LLM simulates human‑like strategic behavior using personality shards,
 multi-agent council, and Clausewitz AI personality overrides.
 
+For **AI empires**, the personality system steers Stellaris’ native AI via personality
+overrides + stat modifiers — the LLM decides macro strategy while the native AI
+handles micro (build queues, research, fleets).
+
+For the **player**, the personality system produces strategic suggestions displayed
+in the Rich TUI.
+
 ---
 
 ## 1. Purpose
@@ -107,9 +114,30 @@ Personalities evolve with:
 
 ---
 
-## 7. Anti‑Poisoning
-Personalities must:
-- Obey ruleset
-- Obey meta
-- Use only known information
-- Never invent mechanics
+## 8. Clausewitz AI Personality Overrides
+
+The mod includes four Clausewitz personality variants that Stellaris’ native AI reads
+directly.  The LLM’s decision sets stance flags, and the mod event switches the
+active personality:
+
+| Personality | Aggression | Combat Bravery | Use Case |
+|---|---|---|---|
+| `overmind_controlled` | 1.0 | 1.5 | Balanced (default) |
+| `overmind_controlled_aggressive` | 2.0 | 2.0 | BUILD_FLEET, PREPARE_WAR |
+| `overmind_controlled_defensive` | 0.25 | 1.0 | DEFEND, CONSOLIDATE |
+| `overmind_controlled_assault` | 3.0 | 3.0 | Active war (rarely retreat) |
+
+All variants use 4.3.4 weapon meta: kinetic weapons, shields > armor,
+autocannon+plasma for anti-corvette.
+
+---
+
+## 9. Player Mode: Strategic Advisor
+
+In player mode, the personality system produces a **suggestion** instead of
+override flags.  The suggestion includes:
+- The recommended macro action (e.g. FOCUS_TECH)
+- Reasoning citing ruleset elements
+- Specific tips (e.g. “Build research labs on your capital”)
+
+Displayed in the TUI’s yellow “Suggestion” panel and saved to `overmind_suggestion.txt`.
