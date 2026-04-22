@@ -931,13 +931,14 @@ PHASE_PRIORITIES: dict[GamePhase, dict] = {
 # ======================================================================== #
 
 NAVAL_CAP_USAGE: dict[str, int] = {
-    "corvette": 1,
-    "destroyer": 2,
-    "cruiser": 4,
-    "battleship": 8,
-    "titan": 16,
-    "juggernaut": 32,
-    "colossus": 32,
+    "corvette": 5,
+    "frigate": 8,
+    "destroyer": 10,
+    "cruiser": 20,
+    "battleship": 40,
+    "titan": 80,
+    "juggernaut": 100,
+    "colossus": 100,
 }
 
 BASE_NAVAL_CAP = 50

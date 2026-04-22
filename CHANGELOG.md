@@ -27,8 +27,8 @@
 ### Ruleset & Personality Fixes
 - **Ruleset hierarchy resolved** — `generate_ruleset()` now produces a `resolved` dict that flattens all layers with correct priority (Traits < Civics < Ethics < Origin)
 - **Personality origin overrides use `max()` assignment** — critical origins (Endbringers, Void Dwellers, Necrophage, etc.) now force minimum values instead of additive nudges that could be overridden by lower-priority layers
-- **Naval cap values corrected** — corvette=1, destroyer=2, cruiser=4, battleship=8, titan=16, juggernaut=32, colossus=32 (was wildly inflated)
-- **Removed frigate** — frigate ship class doesn't exist in vanilla Stellaris 4.3.4
+- **Naval cap values verified** — corvette=5, frigate=8, destroyer=10, cruiser=20, battleship=40, titan=80, juggernaut=100, colossus=100 (confirmed from wiki: ship size = naval cap in 4.3.x)
+- **Frigate retained** — frigates exist in Stellaris 4.3.4 (added in 4.0 Cosmic Storms)
 
 ### Error Handling Improvements
 - Narrowed `except Exception` to specific types across 10+ locations:
