@@ -117,6 +117,8 @@ python -m engine.main
 | `C` | Toggle multi-agent council |
 | `P` | Toggle strategic planner |
 | `R` | Toggle decision recording (for training) |
+| `F` | Toggle fast decisions (code-only for trivial cases) |
+| `L` | Open live log viewer in a new terminal window |
 | `Q` | Quit |
 
 ### AI Mode — Steer AI Empires
@@ -148,6 +150,7 @@ mode = "ai"
 # ai_country_ids = [1, 2, 5]     # specific country IDs (empty = all)
 # ai_exclude_ids = [3]            # skip these
 ai_exclude_fallen = true           # skip Fallen Empires
+fast_decisions = true              # code-only fast path for trivial decisions
 ```
 
 ### Offline Testing (no GPU)
@@ -206,6 +209,37 @@ api_key = ""  # or set OVERMIND_LLM_ONLINE_API_KEY env var
 2. **Autosave frequency** — Settings → Game → Autosave: Monthly (recommended)
 3. **Non-Ironman** — AI mode requires non-Ironman saves for mod event access
 4. **Start a game** — the engine auto-detects your empire from the save file
+
+---
+
+## Meta Management
+
+The engine's strategic knowledge is version-locked. When Stellaris gets a new
+patch, the meta rules need updating. Meta files live in `docs/meta/` as
+structured JSON.
+
+**Scaffold a new version's meta:**
+```powershell
+# From the latest save file (auto-detects version):
+python scripts/scaffold_meta.py --detect
+
+# For a specific version (copies from existing):
+python scripts/scaffold_meta.py 4.5.0 --from 4.3.4
+
+# List available meta versions:
+python scripts/scaffold_meta.py --list
+```
+
+**Recommended sources for updating meta:**
+| Source | What it provides |
+|---|---|
+| [Stellaris Wiki Patch Notes](https://stellaris.paradoxwikis.com) | Official mechanical changes |
+| [stellaris-build.com](https://stellaris-build.com) | Community-tested builds + tier lists |
+| Aktion YouTube | Ship combat testing (weapon verdicts) |
+| Stefan Anon / MontuPlays | Economy optimization guides |
+| Game files `common/defines/` | Raw numeric values |
+
+**Important:** Meta must be tested in real gameplay — don't just copy patch notes.
 
 ---
 

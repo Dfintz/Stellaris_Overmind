@@ -29,6 +29,24 @@ log = logging.getLogger(__name__)
 
 GAME_VERSION = "4.3.4"
 
+
+def detect_game_version(meta: dict) -> str:
+    """Extract the game version from save file metadata.
+
+    Stellaris saves store version as e.g. ``"Cetus v4.3.4"``.
+    Returns just the numeric part (``"4.3.4"``).
+    """
+    raw = str(meta.get("version", ""))
+    # Format: "PatchName vX.Y.Z" or just "X.Y.Z"
+    if " v" in raw:
+        return raw.split(" v", 1)[1].strip()
+    # Try to extract version-like pattern
+    import re
+    match = re.search(r"\d+\.\d+\.\d+", raw)
+    if match:
+        return match.group()
+    return raw or GAME_VERSION
+
 # Intel level thresholds for fog-of-war filtering
 INTEL_LEVELS = {
     0: "none",      # name + attitude only
@@ -142,8 +160,11 @@ class SaveReader:
         # Use meta name as display name (resolved from localization)
         display_name = str(meta.get("name", player_name))
 
+        version = detect_game_version(meta)
+
         return _extract_state_for_country(
             gamestate, player_country, player_id, display_name, year, month,
+            version=version,
         )
 
     def read_ai_states(
@@ -187,6 +208,7 @@ class SaveReader:
         meta = raw.get("meta", {})
         gamestate = raw.get("gamestate", {})
 
+        version = detect_game_version(meta)
         date = meta.get("date", gamestate.get("date", "2200.01.01"))
         year, month = _parse_date(date)
 
@@ -200,6 +222,7 @@ class SaveReader:
             name = _get_country_display_name(country, str(cid))
             state = _extract_state_for_country(
                 gamestate, country, str(cid), name, year, month,
+                version=version,
             )
             state["country_id"] = cid
             states.append(state)
@@ -276,10 +299,11 @@ def _extract_state_for_country(
     display_name: str,
     year: int,
     month: int,
+    version: str = "",
 ) -> dict:
     """Build a state snapshot for any country (player or AI)."""
     return {
-        "version": GAME_VERSION,
+        "version": version or GAME_VERSION,
         "year": year,
         "month": month,
         "empire": _extract_empire_info(country, display_name),

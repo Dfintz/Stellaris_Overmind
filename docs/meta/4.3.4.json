@@ -1,0 +1,110 @@
+{
+  "version": "4.3.4",
+  "patch_name": "Cetus",
+  "sources": [
+    "stellaris.paradoxwikis.com/Patch_4.3",
+    "stellaris-build.com",
+    "Aktion — We Tested 200+ Ship Builds",
+    "KaelGotRice — 4.3 Meta: Strongest Builds"
+  ],
+
+  "weapon_verdicts": {
+    "disruptors": {"verdict": "DEAD", "notes": "~300 days to kill a corvette; armor/shield hardening kills bypass"},
+    "autocannon_plasma": {"verdict": "META", "notes": "~23 days to kill a corvette; best for corvette/destroyer swarms"},
+    "kinetic_artillery_neutron": {"verdict": "META", "notes": "Best cruiser loadout"},
+    "tachyon_kinetic": {"verdict": "META", "notes": "Best long-range artillery battleship"},
+    "giga_cannon_plasma": {"verdict": "STRONG", "notes": "Best close-range brawler battleship"},
+    "titan_perdition": {"verdict": "META_DEFINING", "notes": "500 dmg, 40 range, AoE; punishes small fleet spam"},
+    "crystal_hull_plating": {"verdict": "VIABLE", "notes": "Flat damage reduction strong on tanky ships"},
+    "torpedoes": {"verdict": "NERFED", "notes": "Damage bonus reduced to 20% of former values"},
+    "shield_capacitors": {"verdict": "BUFFED", "notes": "Massively buffed; always consider shield-heavy builds"}
+  },
+
+  "forbidden_weapons": ["disruptor", "disruptors", "arc_emitter"],
+  "forbidden_fleet_patterns": ["corvette_only", "all_corvettes"],
+
+  "fleet_templates": {
+    "early": {
+      "composition": {"corvette": 80, "destroyer": 20},
+      "notes": "Fill 50 naval cap. Corvettes with autocannon+plasma. Add destroyers for PD.",
+      "naval_cap_per_ship": {"corvette": 5, "destroyer": 10}
+    },
+    "mid": {
+      "composition": {"corvette": 30, "cruiser": 50, "destroyer": 20},
+      "notes": "Cruisers with kinetic artillery + neutron launchers. Keep corvette screen.",
+      "naval_cap_per_ship": {"corvette": 5, "cruiser": 20, "destroyer": 10}
+    },
+    "late": {
+      "composition": {"battleship": 60, "titan": 5, "corvette": 20, "cruiser": 15},
+      "notes": "Titan + battleship artillery core. Split fleets to avoid enemy titan AoE.",
+      "naval_cap_per_ship": {"battleship": 40, "titan": 80, "corvette": 5, "cruiser": 20}
+    }
+  },
+
+  "economy_rules": {
+    "early": {
+      "focus": "minerals_first",
+      "notes": "Minerals are the foundation. Energy can be balanced later. Never stop building.",
+      "alloy_priority": "basic fleet before expanding",
+      "colony_cadence": "max 3 underdeveloped before colonizing more"
+    },
+    "mid": {
+      "focus": "alloy_megafactories",
+      "notes": "Transition to district specializations. Automation buildings now job-specific.",
+      "specialize_planets": true,
+      "trade_builds": "top-tier in 4.3"
+    },
+    "late": {
+      "focus": "repeatables_megastructures",
+      "notes": "Repeatables give +20 naval cap per tech. Dyson Sphere + Matter Decompressor essential."
+    }
+  },
+
+  "combat_rules": {
+    "ship_tankiness": "much higher than pre-4.3; battles last longer",
+    "armor_shield_hardening": "(tier - 1)% per tier",
+    "naval_cap_multiplier": "5x (corvette=5, destroyer=10, cruiser=20, BB=40, titan=80)",
+    "base_naval_cap": 50,
+    "split_fleets": "Always split to avoid titan AoE concentration",
+    "starbases_unreliable": "Don't depend on starbases for defense",
+    "frigate_buff": "Destroyer speed, +1 utility/aux slot"
+  },
+
+  "crisis_counters": {
+    "unbidden": "Armor-heavy + Plasma (they bypass shields)",
+    "contingency": "Kinetic + Artillery (they're armor-heavy)",
+    "prethoryn": "Balanced loadout; they have mixed defenses"
+  },
+
+  "origin_tiers": {
+    "S": ["Cybernetic Creed", "Under One Rule", "Void Dwellers", "Teachers of the Shroud"],
+    "A": ["Prosperous Unification", "Hegemon", "Clone Army", "Scion"],
+    "B": ["Mechanist", "Syncretic Evolution", "Life Seeded"],
+    "C": ["Lost Colony", "Galactic Doorstep", "Resource Consolidation"],
+    "F": ["Post-Apocalyptic", "Calamitous Birth"]
+  },
+
+  "ascension_meta": {
+    "psionic": "THE meta — unity generation, covenant power spikes, mid-game alloy spikes",
+    "virtual": "Void Dwellers + unity stacking → extremely strong post-ascension tech explosion",
+    "cybernetic": "Double-dip organic + cybernetic traits; Creed provides strongest worker buff",
+    "synthetic": "Under One Rule → late-game snowball; Luminary ruler unique synth trait"
+  },
+
+  "key_changes_from_previous": [
+    "Ships much tankier (armor/shield hardening)",
+    "Disruptors completely dead (bypass weapons obsolete)",
+    "Job research output halved, tech costs halved",
+    "Most stability bonuses reduced to 1/2 - 1/3",
+    "Unity sources reduced; base empire unity = 10",
+    "Many job output modifiers → job efficiency modifiers",
+    "All ship naval cap usage ~5x higher",
+    "Corvee System no longer best worker civic (ethic changes)",
+    "Authoritarian: worker bonus → worker job efficiency",
+    "Corporate authority: +1 envoy instead of +1 external leader pool"
+  ],
+
+  "meta_rules_domestic": "4.3.4 META: Job EFFICIENCY > raw output. Specialize planets (forge/research/factory). Minerals = foundation early. Trade builds top-tier. Unity rush + ascension = strongest macro. COLONIZE aggressively. FOCUS_TECH when behind. Stability bonuses halved.",
+
+  "meta_rules_military": "4.3.4 META: Disruptors DEAD. Autocannon+Plasma = swarm meta. Titan AoE = meta-defining, split fleets. Naval cap 5x (corvette=5, BB=40). BUILD_STARBASE at chokepoints. DIPLOMACY for federations. ESPIONAGE for intel. PREPARE_WAR vs hostile neighbors."
+}

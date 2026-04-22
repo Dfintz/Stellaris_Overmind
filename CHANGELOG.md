@@ -1,5 +1,23 @@
 # Changelog
 
+## 2025-04-22 — Version-Aware Meta System
+
+### Meta Management
+- **Game version auto-detection** — `detect_game_version()` extracts version from save metadata (e.g. "Cetus v4.3.4" → "4.3.4")
+- **Meta loader** (`engine/meta_loader.py`) — loads version-specific meta from `docs/meta/X.Y.Z.json`, falls back to nearest version
+- **Structured meta file** (`docs/meta/4.3.4.json`) — weapon verdicts, fleet templates, economy rules, origin tiers, crisis counters, ascension meta
+- **Scaffold script** (`scripts/scaffold_meta.py`) — `python scripts/scaffold_meta.py 4.5.0 --from 4.3.4` creates a new meta file pre-filled from the base version
+  - `--detect` auto-detects version from latest save
+  - `--list` shows available versions
+- State snapshots now carry detected game version instead of hardcoded constant
+
+### Files Added
+- `engine/meta_loader.py` — version-aware meta loading with fallback chain
+- `docs/meta/4.3.4.json` — structured meta for Stellaris 4.3.4
+- `scripts/scaffold_meta.py` — scaffolding tool for new patch versions
+
+---
+
 ## 2025-04-22 — AI Mode Live Session
 
 ### Major Features
