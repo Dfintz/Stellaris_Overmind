@@ -46,8 +46,8 @@ class LogCapture(logging.Handler):
         try:
             msg = self.format(record)
             self.records.append(msg)
-        except Exception:
-            pass
+        except (ValueError, TypeError, AttributeError):
+            self.handleError(record)
 
 
 def _format_uptime(seconds: float) -> str:
@@ -236,6 +236,8 @@ def run_console(
         if log_file:
             controls.append("L:", style="bold cyan")
             controls.append("log ", style="")
+        controls.append("O:", style="bold cyan")
+        controls.append("options ", style="")
         controls.append("Q:", style="bold red")
         controls.append("quit", style="")
 
@@ -323,6 +325,35 @@ def run_console(
                 _open_log_tail(log_file)
             else:
                 log.info("No log file configured — restart with --log-file <path>")
+        elif key == "o":
+            _open_options_menu()
+
+    def _open_options_menu() -> None:
+        """Open an options menu in a new terminal window.
+
+        Runs the setup wizard in 'reconfig' mode — edits config.toml
+        without restarting the engine. Changes to toggles (council,
+        planner, recording, fast) take effect immediately via
+        console_config. LLM/path changes require a restart.
+        """
+        import subprocess
+        import sys
+
+        try:
+            if sys.platform == "win32":
+                subprocess.Popen(
+                    ["powershell", "-NoExit", "-Command",
+                     "Write-Host 'Overmind Options' -ForegroundColor Cyan; "
+                     "python -m engine.setup_wizard"],
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                )
+            else:
+                subprocess.Popen(
+                    ["python", "-m", "engine.setup_wizard"],
+                )
+            log.info("Opened options menu in new terminal")
+        except (OSError, FileNotFoundError) as exc:
+            log.warning("Could not open options menu: %s", exc)
 
     # Start key listener thread
     key_thread = threading.Thread(target=_key_listener, daemon=True)

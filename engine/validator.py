@@ -76,7 +76,7 @@ def validate_directive(
     # In AI mode, targets are guidance for the native AI, not direct commands.
     # Only EXPAND truly needs spatial validation (claiming specific systems).
     # COLONIZE targets are planet suggestions the native AI interprets.
-    _SPATIAL_ACTIONS = {"EXPAND"}
+    _SPATIAL_ACTIONS = {"EXPAND", "BUILD_STARBASE", "COLONIZE"}
     # Empire-targeting actions must reference known empires
     _EMPIRE_ACTIONS = {"DIPLOMACY", "ESPIONAGE", "PREPARE_WAR"}
     if target is not None and action in _SPATIAL_ACTIONS:

@@ -293,43 +293,45 @@ def build_personality(
         elif trait in ("Quick Learners", "Enduring", "Venerable"):
             p.tech_focus += 0.02
 
-    # --- Origin personality ---
+    # --- Origin personality (highest priority — uses assignment for critical fields) ---
     if origin in ("Endbringers", "Doomsday"):
-        p.risk_tolerance += 0.2
-        p.crisis_preparedness += 0.2
+        p.risk_tolerance = max(p.risk_tolerance, 0.8)
+        p.crisis_preparedness = max(p.crisis_preparedness, 0.8)
     elif origin in ("Cybernetic Creed", "Under One Rule"):
-        p.tech_focus += 0.1
+        p.tech_focus = max(p.tech_focus, 0.6)
     elif origin == "Void Dwellers":
-        p.expansion_drive += 0.1
+        p.expansion_drive = max(p.expansion_drive, 0.6)
         p.unity_focus += 0.1
     elif origin == "Rogue Servitor":
-        p.unity_focus += 0.2
+        p.unity_focus = max(p.unity_focus, 0.7)
         p.diplomatic_openness += 0.1
     elif origin in ("Teachers of the Shroud", "Shroud-Forged"):
-        p.unity_focus += 0.15
+        p.unity_focus = max(p.unity_focus, 0.65)
     elif origin == "Necrophage":
-        p.war_willingness += 0.1
-        p.expansion_drive += 0.1
+        p.war_willingness = max(p.war_willingness, 0.6)
+        p.expansion_drive = max(p.expansion_drive, 0.6)
     elif origin == "Synthetic Fertility":
-        p.tech_focus += 0.1
+        p.tech_focus = max(p.tech_focus, 0.6)
         p.expansion_drive += 0.05
     elif origin in ("Clone Army", "Overtuned"):
-        p.expansion_drive += 0.1
+        p.expansion_drive = max(p.expansion_drive, 0.6)
     elif origin == "Shattered Ring":
-        p.tech_focus += 0.15
-        p.expansion_drive -= 0.1
+        p.tech_focus = max(p.tech_focus, 0.65)
+        p.expansion_drive = min(p.expansion_drive, 0.4)
     elif origin in ("Hegemon", "Common Ground"):
-        p.diplomatic_openness += 0.15
+        p.diplomatic_openness = max(p.diplomatic_openness, 0.65)
     elif origin == "Remnants":
-        p.tech_focus += 0.1
+        p.tech_focus = max(p.tech_focus, 0.6)
     elif origin == "Progenitor Hive":
-        p.expansion_drive += 0.15
+        p.expansion_drive = max(p.expansion_drive, 0.65)
     elif origin == "Ocean Paradise":
-        p.trade_focus += 0.15
-        p.expansion_drive -= 0.05
+        p.trade_focus = max(p.trade_focus, 0.65)
+        p.expansion_drive = min(p.expansion_drive, 0.45)
     elif origin == "Imperial Fiefdom":
         p.diplomatic_openness += 0.1
         p.war_willingness += 0.05
+    elif origin == "Inward Perfection":
+        p.diplomatic_openness = 0.0
 
     # --- Ascension preference from origin ---
     p.ascension_preference = ASCENSION_PREFERENCES.get(origin, "any")

@@ -62,7 +62,9 @@ class GameRecorder:
     """Records decisions during a live game for later training."""
 
     def __init__(self, game_id: str | None = None, replay_dir: Path = REPLAY_DIR) -> None:
-        self._game_id = game_id or f"game_{uuid.uuid4().hex[:8]}"
+        raw_id = game_id or f"game_{uuid.uuid4().hex[:8]}"
+        # Sanitize game_id to prevent path traversal
+        self._game_id = Path(raw_id).name.replace("..", "_")
         self._replay_dir = replay_dir
         self._records: list[DecisionRecord] = []
         self._pending: list[DecisionRecord] = []  # waiting for state_after

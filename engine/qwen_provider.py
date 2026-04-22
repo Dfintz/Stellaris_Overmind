@@ -117,7 +117,7 @@ class QwenVLLMProvider(LLMProvider):
         try:
             self._get("/health")
             return True
-        except Exception:
+        except (LLMProviderError, OSError):
             return False
 
     @property
@@ -222,7 +222,7 @@ class OpenAICompatProvider(LLMProvider):
         try:
             self._get("/v1/models")
             return True
-        except Exception:
+        except (LLMProviderError, OSError):
             return False
 
     @property

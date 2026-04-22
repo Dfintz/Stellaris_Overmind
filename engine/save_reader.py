@@ -114,7 +114,7 @@ class SaveReader:
         log.info("Parsing save file: %s", latest.name)
         try:
             raw = parse_save(latest)
-        except Exception:
+        except (OSError, ValueError, KeyError):
             log.exception("Failed to parse save file: %s", latest)
             return None
 
@@ -198,7 +198,7 @@ class SaveReader:
         log.info("Parsing save file for AI empires: %s", latest.name)
         try:
             raw = parse_save(latest)
-        except Exception:
+        except (OSError, ValueError, KeyError):
             log.exception("Failed to parse save file: %s", latest)
             return None
 
@@ -302,15 +302,21 @@ def _extract_state_for_country(
     version: str = "",
 ) -> dict:
     """Build a state snapshot for any country (player or AI)."""
+    fleets = _extract_fleets(gamestate, country)
+    own_fleet_power = sum(
+        f.get("power", 0) for f in fleets if isinstance(f, dict)
+    )
     return {
         "version": version or GAME_VERSION,
         "year": year,
         "month": month,
         "empire": _extract_empire_info(country, display_name),
         "economy": _extract_economy(country),
-        "fleets": _extract_fleets(gamestate, country),
+        "fleets": fleets,
         "colonies": _extract_colonies(gamestate, country),
-        "known_empires": _extract_known_empires(gamestate, country),
+        "known_empires": _extract_known_empires(
+            gamestate, country, player_fleet_power=own_fleet_power,
+        ),
         "technology": _extract_technology(country),
         "traditions": _extract_traditions(country),
         "ascension_perks": _extract_ascension_perks(country),
@@ -719,6 +725,7 @@ def _extract_colonies(
 
 def _extract_known_empires(
     gamestate: dict, player_country: dict,
+    player_fleet_power: int = 0,
 ) -> list[dict]:
     """Extract info about known foreign empires, filtered by intel level."""
     known = []
@@ -771,7 +778,7 @@ def _extract_known_empires(
 
         if intel >= 30:  # Medium
             entry["known_fleet_power"] = _estimate_fleet_power(
-                gamestate, str(target_id),
+                gamestate, str(target_id), player_fleet_power,
             )
 
         if intel >= 60:  # High
@@ -804,8 +811,15 @@ def _intel_to_label(intel: int) -> str:
     return "none"
 
 
-def _estimate_fleet_power(gamestate: dict, country_id: str) -> int | str:
-    """Estimate fleet power for a foreign empire (requires medium intel)."""
+def _estimate_fleet_power(
+    gamestate: dict, country_id: str, player_fleet_power: int = 0,
+) -> str:
+    """Estimate fleet power for a foreign empire as a relative bracket.
+
+    At medium intel (30), Stellaris only shows relative strength
+    (Equivalent/Superior/etc.), NOT exact fleet power numbers.
+    Returns a bracket classification based on ratio to player fleet power.
+    """
     total = 0
     all_fleets = gamestate.get("fleet", {})
     if not isinstance(all_fleets, dict):
@@ -817,12 +831,36 @@ def _estimate_fleet_power(gamestate: dict, country_id: str) -> int | str:
             power = fleet.get("military_power", 0)
             if isinstance(power, (int, float)):
                 total += int(power)
-    return total if total > 0 else "Unknown"
+    if total <= 0:
+        return "Unknown"
+    if player_fleet_power <= 0:
+        return "Unknown"
+    ratio = total / player_fleet_power
+    if ratio >= 2.5:
+        return "Overwhelming"
+    if ratio >= 1.5:
+        return "Superior"
+    if ratio >= 0.75:
+        return "Equivalent"
+    if ratio >= 0.4:
+        return "Inferior"
+    return "Pathetic"
 
 
 def _estimate_economy_class(country: dict) -> str:
-    """Classify economy strength (requires high intel)."""
-    res = country.get("resources", {})
+    """Classify economy strength (requires high intel).
+
+    Returns only a classification label, never exact resource numbers.
+    Reads from the correct 4.3.4 save path:
+    country.modules.standard_economy_module.resources
+    """
+    modules = country.get("modules", {})
+    if not isinstance(modules, dict):
+        return "Unknown"
+    econ_mod = modules.get("standard_economy_module", {})
+    if not isinstance(econ_mod, dict):
+        return "Unknown"
+    res = econ_mod.get("resources", {})
     if not isinstance(res, dict):
         return "Unknown"
     energy = res.get("energy", 0)

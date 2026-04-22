@@ -39,6 +39,38 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+# Fields that should never appear in known_empires at low/no intel
+_FOW_SUSPECT_FIELDS = {"economy", "economy_class", "tech_count", "known_fleet_power",
+                       "military_power", "fleet_power", "resources"}
+
+
+def _sanitize_snapshot_fow(data: dict) -> dict:
+    """Strip fields from a legacy JSON snapshot that could violate fog-of-war.
+
+    The autosave path (SaveBridge) has proper intel-level filtering, but
+    the legacy JSON bridge trusts the Clausewitz exporter entirely.
+    This adds defense-in-depth by warning on suspicious fields.
+    """
+    empires = data.get("known_empires", [])
+    if not isinstance(empires, list):
+        return data
+
+    for empire in empires:
+        if not isinstance(empire, dict):
+            continue
+        intel = empire.get("intel_level", "none")
+        if intel in ("none", "low"):
+            # At low/no intel, strip fields that require higher intel
+            stripped = [k for k in empire if k in _FOW_SUSPECT_FIELDS]
+            for k in stripped:
+                del empire[k]
+            if stripped:
+                log.warning(
+                    "FoW sanitize: stripped %s from empire '%s' (intel=%s)",
+                    stripped, empire.get("name", "?"), intel,
+                )
+    return data
+
 
 # ======================================================================== #
 # Config
@@ -128,7 +160,7 @@ class BridgeReader:
                 "Read JSON snapshot: year=%s month=%s event=%s",
                 data.get("year"), data.get("month"), data.get("event"),
             )
-            return data
+            return _sanitize_snapshot_fow(data)
         except (json.JSONDecodeError, OSError) as exc:
             log.warning("Failed to read snapshot: %s", exc)
             return None
@@ -140,7 +172,8 @@ class BridgeReader:
         try:
             raw = ack_path.read_text(encoding="utf-8")
             return json.loads(raw)
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as exc:
+            log.debug("Failed to read ack file: %s", exc)
             return None
 
 

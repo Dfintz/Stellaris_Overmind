@@ -1,5 +1,51 @@
 # Changelog
 
+## 2026-04-22 — LM Studio Support, Model Selection, Security & FoW Fixes
+
+### LM Studio Integration
+- **LM Studio as a first-class provider** — `provider = "lm-studio"` in config.toml
+- Setup wizard auto-detects running LM Studio alongside Ollama
+- LM Studio recommended settings documented in `config.example.toml`
+- **Max Concurrent Predictions: 4** enables parallel sub-agent calls (advantage over Ollama)
+- Supports local, network, and remote LM Studio instances
+
+### Setup Wizard Enhancements
+- **Auto-pull models** — wizard offers to download recommended models via Ollama API with streaming progress
+- **LM Studio provider option** — detects loaded models, recommends GGUF quantizations
+- **Separate planner model** — wizard can configure a larger model for the strategic planner
+- **Network URL support** — all providers accept any URL (local, LAN, remote) with connectivity probing
+- **Model recommendations** — shows curated list (Qwen2.5 3B/7B, Gemma 3 4B, Phi-4-mini, Llama 3.2 3B)
+- URL scheme validation prevents SSRF attacks
+- **Dashboard `O` key** — opens the setup wizard in a new terminal for live reconfiguration
+
+### Fog-of-War Fixes (CRITICAL)
+- **Fleet power now returns relative brackets** — `_estimate_fleet_power` returns "Pathetic"/"Inferior"/"Equivalent"/"Superior"/"Overwhelming" instead of exact numbers (matches Stellaris 4.3.4 medium-intel behavior)
+- **Economy class reads correct save path** — `_estimate_economy_class` now reads from `country.modules.standard_economy_module.resources` instead of the non-existent `country.resources`
+- **Legacy bridge FoW sanitization** — `BridgeReader.read_snapshot` strips suspect fields from empires at low/no intel (defense-in-depth)
+- **Validator checks BUILD_STARBASE and COLONIZE targets** — spatial FoW validation now covers all spatial actions, not just EXPAND
+
+### Ruleset & Personality Fixes
+- **Ruleset hierarchy resolved** — `generate_ruleset()` now produces a `resolved` dict that flattens all layers with correct priority (Traits < Civics < Ethics < Origin)
+- **Personality origin overrides use `max()` assignment** — critical origins (Endbringers, Void Dwellers, Necrophage, etc.) now force minimum values instead of additive nudges that could be overridden by lower-priority layers
+- **Naval cap values corrected** — corvette=1, destroyer=2, cruiser=4, battleship=8, titan=16, juggernaut=32, colossus=32 (was wildly inflated)
+- **Removed frigate** — frigate ship class doesn't exist in vanilla Stellaris 4.3.4
+
+### Error Handling Improvements
+- Narrowed `except Exception` to specific types across 10+ locations:
+  - `save_reader.py`: `(OSError, ValueError, KeyError)`
+  - `game_loop.py`: `(OSError, ValueError, RuntimeError)` + consecutive failure counter (stops after 10)
+  - `setup_wizard.py`: `(urllib.error.URLError, OSError, json.JSONDecodeError, ValueError)`
+  - `qwen_provider.py`: `(LLMProviderError, OSError)`
+  - `console.py`: `(ValueError, TypeError, AttributeError)` with `handleError()`
+- `bridge.py` `read_ack()` now logs failures at debug level
+- `recorder.py` sanitizes `game_id` to prevent path traversal
+
+### Housekeeping
+- Added `from __future__ import annotations` to `__init__.py` and `__main__.py`
+- Added `lm-studio` and `lmstudio` as provider aliases in `main.py`
+
+---
+
 ## 2025-04-22 — Setup Wizard, Constructive Suggestions, Bug Fixes
 
 ### Setup Wizard

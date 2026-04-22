@@ -931,14 +931,13 @@ PHASE_PRIORITIES: dict[GamePhase, dict] = {
 # ======================================================================== #
 
 NAVAL_CAP_USAGE: dict[str, int] = {
-    "corvette": 5,
-    "frigate": 8,
-    "destroyer": 10,
-    "cruiser": 20,
-    "battleship": 40,
-    "titan": 80,
-    "juggernaut": 100,
-    "colossus": 100,
+    "corvette": 1,
+    "destroyer": 2,
+    "cruiser": 4,
+    "battleship": 8,
+    "titan": 16,
+    "juggernaut": 32,
+    "colossus": 32,
 }
 
 BASE_NAVAL_CAP = 50
@@ -1280,6 +1279,16 @@ def generate_ruleset(
             ruleset["meta_tier"] = overrides["meta_tier"]
         if "meta_strategy" in overrides:
             ruleset["meta_strategy"] = overrides["meta_strategy"]
+
+    # Resolve conflicts: flatten all layers with correct priority order.
+    # Lowest priority first → highest last (each .update() overwrites).
+    # Traits (5) < Civics (4) < Ethics (3) < Origin (1)
+    resolved: dict = {}
+    resolved.update(ruleset["micro_modifiers"])  # traits — lowest
+    resolved.update(ruleset["modifiers"])         # civics
+    resolved.update(ruleset["base"])              # ethics
+    resolved.update(ruleset["overrides"])         # origin — highest
+    ruleset["resolved"] = resolved
 
     return ruleset
 

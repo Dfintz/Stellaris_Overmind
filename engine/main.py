@@ -39,7 +39,8 @@ def _build_local_provider(cfg) -> LLMProvider | None:
             timeout_s=cfg.llm.timeout_s,
         )
 
-    if name in ("openai-compat", "openai", "ollama", "azure", "foundry"):
+    if name in ("openai-compat", "openai", "ollama", "lm-studio", "lmstudio",
+                 "azure", "foundry"):
         return OpenAICompatProvider(
             base_url=cfg.llm.base_url,
             model=cfg.llm.model,

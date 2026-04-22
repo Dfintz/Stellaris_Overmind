@@ -275,14 +275,20 @@ class GameLoopController:
         self._running = True
         log.info("Game loop started — polling every %.1fs", self._bridge_config.poll_interval_s)
 
+        _consecutive_errors = 0
         while self._running:
             try:
                 self._tick()
+                _consecutive_errors = 0
             except KeyboardInterrupt:
                 log.info("Interrupted — shutting down")
                 break
-            except Exception:
-                log.exception("Unhandled error in game loop tick")
+            except (OSError, ValueError, RuntimeError):
+                _consecutive_errors += 1
+                log.exception("Error in game loop tick (%d consecutive)", _consecutive_errors)
+                if _consecutive_errors >= 10:
+                    log.error("Too many consecutive errors — stopping loop")
+                    break
             time.sleep(self._bridge_config.poll_interval_s)
 
         log.info("Game loop stopped — %d decisions made", self.stats.decisions_made)
@@ -641,6 +647,7 @@ class AILoopController:
 
         log.info("AI loop started — polling every %.1fs", self._bridge_config.poll_interval_s)
 
+        _consecutive_errors = 0
         while self._running:
             try:
                 states = reader.read_ai_states(
@@ -649,6 +656,7 @@ class AILoopController:
                     exclude_fallen=self._exclude_fallen,
                 )
                 if states:
+                    _consecutive_errors = 0
                     # Update game year from first state
                     year = states[0].get("year", 0)
                     if year:
@@ -662,8 +670,12 @@ class AILoopController:
             except KeyboardInterrupt:
                 log.info("Interrupted — shutting down")
                 break
-            except Exception:
-                log.exception("Unhandled error in AI loop tick")
+            except (OSError, ValueError, RuntimeError):
+                _consecutive_errors += 1
+                log.exception("Error in AI loop tick (%d consecutive)", _consecutive_errors)
+                if _consecutive_errors >= 10:
+                    log.error("Too many consecutive errors — stopping AI loop")
+                    break
             time.sleep(self._bridge_config.poll_interval_s)
 
         log.info("AI loop stopped — %d decisions made", self.stats.decisions_made)

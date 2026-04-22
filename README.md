@@ -15,7 +15,7 @@ strong human player — live, without pausing the game.
 - **AI mode** — steers Stellaris’ native AI via personality overrides + stat modifiers (no queue bypass)
 - **Multi-agent council** — domestic + military sub-agents with government-weighted arbitration
 - **Strategic planner** — periodic long-term assessments injected into decision prompts
-- **Hybrid LLM provider** — local (Ollama/vLLM), online (OpenRouter/Azure Foundry), or auto-failover hybrid
+- **Hybrid LLM provider** — local (Ollama/LM Studio/vLLM), online (OpenRouter/Azure Foundry), or auto-failover hybrid
 - **AI personality system** — 4 Clausewitz personality variants (balanced/aggressive/defensive/full assault) with 4.3.4 weapon meta
 - **Policy enforcement** — Academic Privilege, war economy, cooperative stance applied automatically
 - **Auto-detect empire** — reads ethics/civics/origin/government from save file (no manual config needed)
@@ -96,6 +96,15 @@ cp mod\stellaris_overmind.mod "C:\Users\YOU\Documents\Paradox Interactive\Stella
 ```powershell
 # Install Ollama from https://ollama.com
 ollama pull qwen2.5:latest          # 7B Q4, ~5GB VRAM
+# Or for sub-agents (faster, smaller):
+ollama pull qwen2.5:3b              # 3B Q4, ~2GB VRAM
+```
+
+**LM Studio (alternative — parallel requests, GUI):**
+```
+# Download from https://lmstudio.ai
+# Search and download: Qwen2.5 3B Instruct (Q4_K_M)
+# Recommended settings: Context=4096, GPU Offload=max, Concurrent Predictions=4
 ```
 
 **Docker vLLM (alternative — GPTQ quantized):**
@@ -141,6 +150,7 @@ python -m engine.main
 | `R` | Toggle decision recording (for training) |
 | `F` | Toggle fast decisions (code-only for trivial cases) |
 | `L` | Open live log viewer in a new terminal window |
+| `O` | Open options/setup wizard in a new terminal |
 | `Q` | Quit |
 
 ### AI Mode — Steer AI Empires

@@ -19,6 +19,32 @@ log = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# RFC 1918 / loopback prefixes for local vs cloud detection
+_LOCAL_URL_MARKERS = (
+    "localhost", "127.0.0.1", "127.0.0.", "::1",
+    "192.168.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
+    "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+    "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+    "169.254.",  # link-local
+)
+
+
+def _is_local_url(url: str) -> bool:
+    """Return True if the URL points to localhost or a private network address."""
+    return any(marker in url for marker in _LOCAL_URL_MARKERS)
+
+
+def _validate_url_scheme(url: str) -> str:
+    """Validate that a URL uses http:// or https:// and return it unchanged.
+
+    Raises ValueError if the scheme is missing or invalid.
+    """
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(
+            f"Invalid URL scheme: '{url}'. Must start with http:// or https://"
+        )
+    return url
+
 
 # ======================================================================== #
 # Path Auto-Discovery
@@ -90,15 +116,117 @@ def discover_save_dir(user_data: Path | None = None) -> Path | None:
 
 def check_ollama(base_url: str = "http://localhost:11434") -> tuple[bool, str]:
     """Check if Ollama is running and what models are available."""
+    import urllib.error
+    import urllib.request
     try:
-        import urllib.request
+        _validate_url_scheme(base_url)
         req = urllib.request.Request(f"{base_url.rstrip('/')}/api/tags")
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read().decode())
             models = [m["name"] for m in data.get("models", [])]
             return True, ", ".join(models) if models else "no models pulled"
-    except Exception:
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError) as exc:
+        log.debug("Ollama check failed: %s", exc)
         return False, "not reachable"
+
+
+def check_lm_studio(base_url: str = "http://localhost:1234") -> tuple[bool, str]:
+    """Check if LM Studio is running and what models are loaded."""
+    import urllib.error
+    import urllib.request
+    try:
+        _validate_url_scheme(base_url)
+        req = urllib.request.Request(f"{base_url.rstrip('/')}/v1/models")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode())
+            models = [m["id"] for m in data.get("data", [])]
+            return True, ", ".join(models) if models else "no models loaded"
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError) as exc:
+        log.debug("LM Studio check failed: %s", exc)
+        return False, "not reachable"
+
+
+def list_ollama_models(base_url: str = "http://localhost:11434") -> list[str]:
+    """Return list of model names available in Ollama."""
+    import urllib.error
+    import urllib.request
+    try:
+        _validate_url_scheme(base_url)
+        req = urllib.request.Request(f"{base_url.rstrip('/')}/api/tags")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode())
+            return [m["name"] for m in data.get("models", [])]
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError) as exc:
+        log.debug("Ollama model listing failed: %s", exc)
+        return []
+
+
+def pull_ollama_model(
+    model: str,
+    base_url: str = "http://localhost:11434",
+) -> bool:
+    """Pull a model from Ollama's registry. Shows progress."""
+    import urllib.request
+    import urllib.error
+
+    url = f"{base_url.rstrip('/')}/api/pull"
+    payload = json.dumps({"name": model, "stream": True}).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    print(f"  Pulling {model} from Ollama registry...")
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            last_status = ""
+            for line in resp:
+                line = line.decode().strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                status = msg.get("status", "")
+                if status != last_status:
+                    if "pulling" in status or "downloading" in status:
+                        total = msg.get("total", 0)
+                        completed = msg.get("completed", 0)
+                        if total > 0:
+                            pct = completed / total * 100
+                            size_gb = total / (1024**3)
+                            print(
+                                f"\r  {status} ({pct:.0f}% of {size_gb:.1f} GB)   ",
+                                end="", flush=True,
+                            )
+                        else:
+                            print(f"\r  {status}   ", end="", flush=True)
+                    elif status == "success":
+                        print(f"\n  Model {model} pulled successfully!")
+                        return True
+                    else:
+                        print(f"\r  {status}   ", end="", flush=True)
+                    last_status = status
+                elif msg.get("total", 0) > 0:
+                    total = msg["total"]
+                    completed = msg.get("completed", 0)
+                    pct = completed / total * 100
+                    print(f"\r  {status} ({pct:.0f}%)   ", end="", flush=True)
+        print()
+        return True
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode() if exc.fp else str(exc)
+        print(f"\n  Failed to pull {model}: HTTP {exc.code} — {detail}")
+        return False
+    except urllib.error.URLError as exc:
+        print(f"\n  Failed to pull {model}: {exc.reason}")
+        return False
+    except Exception as exc:
+        print(f"\n  Failed to pull {model}: {exc}")
+        return False
 
 
 # ======================================================================== #
@@ -191,48 +319,128 @@ def run_wizard() -> dict:
     # --- 3. LLM Provider ---
     print("\n[3/6] LLM Provider")
     ollama_ok, ollama_info = check_ollama()
+    lmstudio_ok, lmstudio_info = check_lm_studio()
+
     if ollama_ok:
         print(f"  Ollama detected locally: {ollama_info}")
+    if lmstudio_ok:
+        print(f"  LM Studio detected locally: {lmstudio_info}")
+
+    # Build provider options based on what's detected
+    provider_options = []
+    default_provider = "stub — Offline testing (no LLM needed)"
+
+    if ollama_ok:
+        provider_options.append("ollama — Local or network Ollama (recommended)")
+        default_provider = "ollama — Local or network Ollama (recommended)"
+    if lmstudio_ok:
+        provider_options.append("lm-studio — LM Studio (local, parallel requests)")
+        if not ollama_ok:
+            default_provider = "lm-studio — LM Studio (local, parallel requests)"
+    provider_options.append("ollama — Local or network Ollama (recommended)" if "ollama" not in str(provider_options) else "")
+    provider_options.append("lm-studio — LM Studio (local, parallel requests)" if "lm-studio" not in str(provider_options) else "")
+    provider_options = [p for p in provider_options if p]  # remove empty
+    provider_options.extend([
+        "openai-compat — Any OpenAI-compatible API (vLLM, cloud, etc.)",
+        "stub — Offline testing (no LLM needed)",
+    ])
 
     provider = _ask_choice(
         "LLM backend:",
-        ["ollama — Local or network Ollama (recommended)",
-         "openai-compat — Any OpenAI-compatible API (vLLM, LM Studio, cloud)",
-         "stub — Offline testing (no LLM needed)"],
-        default="ollama — Local or network Ollama (recommended)" if ollama_ok else "stub — Offline testing (no LLM needed)",
+        provider_options,
+        default=default_provider,
     )
 
     if provider.startswith("ollama"):
         config["provider"] = "ollama"
         default_url = "http://localhost:11434"
-        url = _ask("Ollama URL (localhost or network ip:port)", default_url)
+        url = _ask("Ollama URL (local, network, or remote — e.g. http://192.168.1.50:11434)", default_url)
         config["base_url"] = url.rstrip("/")
 
-        # Check if the specified endpoint is reachable
-        if url != default_url:
-            ok, info = check_ollama(url)
-            if ok:
-                print(f"  Connected to {url}: {info}")
-                ollama_ok, ollama_info = True, info
-            else:
-                print(f"  Warning: could not reach {url} — check the address later")
-                ollama_ok = False
-
-        if ollama_ok and ollama_info != "no models pulled":
-            first_model = ollama_info.split(",")[0].strip()
-            config["model"] = _ask("Model name", first_model)
+        # Always probe the entered URL (may differ from auto-detect)
+        ollama_ok, ollama_info = check_ollama(config["base_url"])
+        if ollama_ok:
+            print(f"  Connected to {config['base_url']}: {ollama_info}")
         else:
-            config["model"] = _ask("Model name", "qwen2.5:latest")
+            print(f"  Warning: could not reach {config['base_url']} — check the address later")
+
+        # Model selection
+        available_models = list_ollama_models(config["base_url"]) if ollama_ok else []
+        recommended = [
+            "qwen2.5:3b", "qwen2.5:7b", "qwen2.5:latest",
+            "gemma3:4b", "phi4-mini", "llama3.2:3b",
+        ]
+
+        if available_models:
+            print(f"  Models already pulled: {', '.join(available_models)}")
+            # Offer pulled models + recommended ones not yet pulled
+            model_options = list(available_models)
+            for r in recommended:
+                if r not in model_options:
+                    model_options.append(f"{r} (not pulled — will download)")
+            config["model"] = _ask_choice(
+                "Which model to use for decisions?",
+                model_options,
+                default=available_models[0],
+            )
+        else:
+            config["model"] = _ask_choice(
+                "Which model? (will be pulled automatically)",
+                recommended,
+                default="qwen2.5:3b",
+            )
+
+        # Clean up " (not pulled ...)" suffix if present
+        config["model"] = config["model"].split(" (")[0].strip()
+
+        # Auto-pull if model not available
+        if ollama_ok and config["model"] not in available_models:
+            if _ask_bool(f"Pull {config['model']} now? (~2-5 GB download)", default=True):
+                pull_ollama_model(config["model"], config["base_url"])
+            else:
+                print(f"  Skipped — pull manually later: ollama pull {config['model']}")
+
+    elif provider.startswith("lm-studio"):
+        config["provider"] = "lm-studio"
+        default_url = "http://localhost:1234"
+        url = _ask("LM Studio URL (local, network, or remote — e.g. http://192.168.1.50:1234)", default_url)
+        config["base_url"] = url.rstrip("/")
+
+        # Always probe the entered URL
+        lms_ok, lms_info = check_lm_studio(config["base_url"])
+        if lms_ok:
+            print(f"  Connected to {config['base_url']}: {lms_info}")
+        else:
+            print(f"  Warning: could not reach {config['base_url']} — check the address later")
+
+        if lms_ok and lms_info != "no models loaded":
+            loaded = lms_info.split(", ")
+            config["model"] = _ask_choice(
+                "Which loaded model to use?",
+                loaded,
+                default=loaded[0],
+            )
+        else:
+            if lms_ok:
+                print("  No model loaded in LM Studio.")
+            print("  Recommended models to download in LM Studio:")
+            print("    Sub-agent:  Qwen2.5 3B Instruct (Q4_K_M) — ~2 GB")
+            print("    Planner:    Qwen2.5 7B Instruct (Q4_K_M) — ~4.7 GB")
+            print("    Alternatives: Gemma 3 4B, Phi-4-mini, Llama 3.2 3B")
+            config["model"] = _ask(
+                "Model name (load it in LM Studio first)",
+                "qwen2.5-3b-instruct",
+            )
 
     elif provider.startswith("openai"):
         config["provider"] = "openai-compat"
-        print("  Enter any OpenAI-compatible endpoint (vLLM, LM Studio, OpenRouter, Azure, etc.)")
+        print("  Enter any OpenAI-compatible endpoint (vLLM, OpenRouter, Azure, etc.)")
         config["base_url"] = _ask("API base URL", "https://openrouter.ai/api/v1")
         config["model"] = _ask("Model name", "qwen/qwen-2.5-72b-instruct")
         config["api_key"] = _ask("API key (leave empty if not needed)", "")
 
-        # Detect if it's a local endpoint
-        if any(x in config["base_url"] for x in ["localhost", "127.0.0.1", "192.168.", "10."]):
+        # Detect if it's a local/network endpoint vs cloud
+        if _is_local_url(config["base_url"]):
             config["mode"] = "local"
         else:
             config["mode"] = "online"
@@ -245,6 +453,65 @@ def run_wizard() -> dict:
     print("\n[4/6] Engine Options")
     config["multi_agent"] = _ask_bool("Enable multi-agent council?", default=True)
     config["planner"] = _ask_bool("Enable strategic planner?", default=False)
+
+    if config["planner"] and config["provider"] in ("ollama", "lm-studio", "openai-compat"):
+        use_separate = _ask_bool(
+            "Use a separate (larger) model for the planner?",
+            default=False,
+        )
+        if use_separate:
+            # Ask where the planner model runs
+            planner_same_host = _ask_bool(
+                f"Is the planner model on the same server ({config['base_url']})?",
+                default=True,
+            )
+            if planner_same_host:
+                config["planner_base_url"] = config["base_url"]
+            else:
+                config["planner_base_url"] = _ask(
+                    "Planner server URL (local, network, or remote)",
+                    config["base_url"],
+                )
+
+            if config["provider"] == "ollama":
+                # Ollama: list models + offer pull
+                planner_recommended = [
+                    "qwen2.5:7b", "qwen2.5:14b", "gemma3:12b", "phi4:14b",
+                ]
+                available = list_ollama_models(config["planner_base_url"])
+                planner_options = []
+                for r in planner_recommended:
+                    if r in available:
+                        planner_options.append(r)
+                    else:
+                        planner_options.append(f"{r} (not pulled — will download)")
+                for a in available:
+                    if a not in planner_recommended and a != config["model"]:
+                        planner_options.insert(0, a)
+
+                config["planner_model"] = _ask_choice(
+                    "Planner model (runs every ~5 in-game years, can be slower/larger):",
+                    planner_options if planner_options else planner_recommended,
+                    default=planner_options[0] if planner_options else "qwen2.5:7b",
+                )
+                config["planner_model"] = config["planner_model"].split(" (")[0].strip()
+
+                # Auto-pull planner model if needed
+                if config["planner_model"] not in available:
+                    if _ask_bool(f"Pull {config['planner_model']} now?", default=True):
+                        pull_ollama_model(config["planner_model"], config["planner_base_url"])
+                    else:
+                        print(f"  Skipped — pull manually: ollama pull {config['planner_model']}")
+            else:
+                # LM Studio / openai-compat: just ask for model name
+                config["planner_model"] = _ask("Planner model name", "qwen2.5-7b-instruct")
+                if config["provider"] == "lm-studio":
+                    print("  Make sure this model is loaded in LM Studio.")
+        else:
+            config["planner_model"] = ""
+    else:
+        config["planner_model"] = ""
+
     config["fast_decisions"] = _ask_bool("Enable fast decisions (skip LLM for trivial cases)?", default=True)
     config["fast_cutoff_year"] = int(_ask("Fast decision cutoff year", "2250"))
 
@@ -404,7 +671,19 @@ def write_config(config: dict, path: Path | None = None) -> Path:
         '',
         '[planner]',
         f'enabled = {str(config["planner"]).lower()}',
-        'provider = "same"',
+    ])
+
+    if config.get("planner_model"):
+        planner_url = config.get("planner_base_url", config.get("base_url", ""))
+        lines.extend([
+            'provider = "separate"',
+            f'base_url = "{planner_url}"',
+            f'model = "{config["planner_model"]}"',
+        ])
+    else:
+        lines.append('provider = "same"')
+
+    lines.extend([
         'interval_years = 5',
         'max_tokens = 512',
         'temperature = 0.4',

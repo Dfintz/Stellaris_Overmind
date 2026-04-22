@@ -18,7 +18,7 @@ user_data_dir = "C:/Users/YOUR_USER/Documents/Paradox Interactive/Stellaris"
 mod_name = "stellaris_overmind"
 
 [llm]
-# Provider options: "qwen-vllm" | "openai-compat" | "ollama" | "stub"
+# Provider options: "qwen-vllm" | "openai-compat" | "ollama" | "lm-studio" | "stub"
 provider = "qwen-vllm"
 
 # Mode: "local" (default), "online" (cloud API only), "hybrid" (local + cloud fallback)
@@ -60,6 +60,26 @@ prompt_cache = true
 # base_url = "https://your-project.services.ai.azure.com/models"
 # model = "Qwen2.5-72B-Instruct"
 # api_key = ""  # set via OVERMIND_LLM_ONLINE_API_KEY or AZURE_AI_KEY
+
+# ─── LM Studio example ───
+# LM Studio exposes an OpenAI-compatible API on localhost:1234.
+# Load a model in the GUI, then use these settings:
+#
+# [llm]
+# provider = "lm-studio"
+# base_url = "http://localhost:1234"
+# model = "qwen2.5-3b-instruct"       # must match the loaded model name
+# max_tokens = 256
+# temperature = 0.3
+#
+# Recommended LM Studio model settings for Stellaris Overmind:
+#   Context Length:            4096    (our prompts are ~1.5-3K tokens)
+#   GPU Offload:               max    (all layers — critical for speed)
+#   Evaluation Batch Size:     512    (prompt processing speed)
+#   Max Concurrent Predictions:  4    (enables parallel sub-agent calls)
+#   Unified KV Cache:           ON    (saves memory)
+#   Offload KV Cache to GPU:    ON    (faster inference)
+#   Keep Model in Memory:       ON    (avoids reload between calls)
 
 [bridge]
 # Autosave directory — the engine watches this for new .sav files.

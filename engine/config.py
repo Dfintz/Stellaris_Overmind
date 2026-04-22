@@ -23,7 +23,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 class LLMConfig:
     """LLM backend configuration."""
 
-    provider: str = "qwen-vllm"  # qwen-vllm | openai-compat | stub
+    provider: str = "qwen-vllm"  # qwen-vllm | openai-compat | ollama | lm-studio | stub
     base_url: str = "http://localhost:8000"
     model: str = "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4"
     max_tokens: int = 256
