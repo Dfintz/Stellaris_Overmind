@@ -81,12 +81,18 @@ def validate_directive(
     _EMPIRE_ACTIONS = {"DIPLOMACY", "ESPIONAGE", "PREPARE_WAR"}
     if target is not None and action in _SPATIAL_ACTIONS:
         raw_colonies = state.get("colonies", [])
-        known_systems = {
-            c.get("name") or c.get("system") or c.get("planet") or str(c)
-            if isinstance(c, dict) else c
-            for c in raw_colonies
+        known_systems: set[str] = set()
+        for c in raw_colonies:
+            if isinstance(c, dict):
+                name = c.get("name") or c.get("system") or c.get("planet")
+                if name:
+                    known_systems.add(str(name))
+            elif c:
+                known_systems.add(str(c))
+        known_empires = {
+            e.get("name") for e in state.get("known_empires", [])
+            if isinstance(e, dict) and e.get("name")
         }
-        known_empires = {e.get("name") for e in state.get("known_empires", [])}
         # Also accept systems from known starbases and fleet locations
         known_fleet_systems = {
             f.get("location_system")

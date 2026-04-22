@@ -151,10 +151,27 @@ def main() -> None:
         "--log-file", type=Path, default=None,
         help="Write logs to file (auto-set to overmind.log when using --console)",
     )
+    parser.add_argument(
+        "--setup", action="store_true",
+        help="Run the interactive setup wizard (creates config.toml)",
+    )
     args = parser.parse_args()
 
+    # Run setup wizard if requested or if config doesn't exist
+    if args.setup:
+        from engine.setup_wizard import run_wizard, write_config
+        config = run_wizard()
+        write_config(config)
+        return
+
+    # Auto-detect missing config
+    config_path = args.config
+    if config_path is None:
+        from engine.setup_wizard import ensure_config
+        config_path = ensure_config()
+
     # Load config
-    cfg = load_config(args.config)
+    cfg = load_config(config_path)
     if args.provider:
         cfg.llm.provider = args.provider
 
@@ -223,6 +240,7 @@ def main() -> None:
             parallel_empires=cfg.multi_agent.parallel,
             recorder=recorder,
             fast_decisions=cfg.target.fast_decisions,
+            fast_cutoff_year=cfg.target.fast_cutoff_year,
         )
 
         log.info("=" * 60)

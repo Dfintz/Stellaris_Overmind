@@ -33,7 +33,27 @@ strong human player — live, without pausing the game.
 
 ## Setup (first time)
 
-### Option A: Automated setup (recommended)
+### Option A: Interactive wizard (recommended)
+
+```powershell
+pip install -e ".[dev,console]"
+python -m engine --setup
+```
+
+The wizard will:
+1. Auto-detect your Stellaris install path (scans Steam libraries)
+2. Auto-detect your save games directory (supports OneDrive)
+3. Detect running Ollama and available models
+4. Let you choose: AI mode or Player advisor mode
+5. Configure council, planner, fast decisions, recording
+6. Generate `config.toml` automatically
+
+The wizard also runs automatically on first launch if no config exists.
+
+Supports network LLM endpoints — enter `http://192.168.1.100:11434` for
+Ollama on another machine, or any OpenAI-compatible URL.
+
+### Option B: PowerShell setup script
 
 ```powershell
 # From the project root:
@@ -47,7 +67,7 @@ This will:
 4. Symlink the mod into your Stellaris mod folder
 5. Verify everything is in place
 
-### Option B: Manual setup
+### Option C: Manual setup
 
 ```powershell
 # 1. Clone and install

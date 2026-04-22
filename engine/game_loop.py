@@ -51,6 +51,105 @@ def _empire_display_name(state: dict, country_id: int) -> str:
     return name
 
 
+def _build_constructive_suggestion(
+    directive: Directive, state: dict, ruleset: dict,  # noqa: ARG001
+) -> str:
+    """Build a detailed, actionable suggestion for the player.
+
+    Instead of just 'BUILD_FLEET', explains what to build, where, and why.
+    """
+    action = directive.action
+    reason = directive.reason[:100]
+    year = state.get("year", 2200)
+    economy = state.get("economy", {})
+    fleets = state.get("fleets", [])
+    colonies = state.get("colonies", [])
+    tech = state.get("technology", {})
+    fleet_power = sum(f.get("power", 0) for f in fleets) if fleets else 0
+    alloys = economy.get("alloys", 0)
+    colony_count = len(colonies) if isinstance(colonies, list) else 0
+
+    parts = [f"[bold yellow]{action}[/bold yellow]"]
+
+    if action == "BUILD_FLEET":
+        if year < 2230:
+            parts.append("Build corvettes with [cyan]Autocannon + Plasma[/cyan] (swarm meta).")
+            parts.append(f"Current fleet: {fleet_power} power. Target: fill naval cap.")
+        elif year < 2280:
+            parts.append("Add [cyan]cruisers[/cyan] with Kinetic Artillery + Neutron Launchers.")
+            parts.append("Keep corvette screen for point defense.")
+        else:
+            parts.append("Build [cyan]battleship artillery[/cyan] + titan. Split fleets vs AoE.")
+        if alloys > 200:
+            parts.append(f"You have {alloys} alloys — good time to invest.")
+
+    elif action == "IMPROVE_ECONOMY":
+        monthly = economy.get("monthly_net", {})
+        energy = monthly.get("energy", 0) if isinstance(monthly, dict) else 0
+        minerals = monthly.get("minerals", 0) if isinstance(monthly, dict) else 0
+        issues = []
+        if energy < 10:
+            issues.append(f"energy income low ({energy}/mo)")
+        if minerals < 20:
+            issues.append(f"mineral income low ({minerals}/mo)")
+        if issues:
+            parts.append(f"Priority: fix {', '.join(issues)}.")
+        parts.append("Build [cyan]mining districts[/cyan] > energy districts. Specialize planets.")
+        if year > 2230:
+            parts.append("Set planet designations for +efficiency bonus.")
+
+    elif action == "FOCUS_TECH":
+        tech_count = tech.get("count", 0) if isinstance(tech, dict) else 0
+        researching = tech.get("in_progress", {}) if isinstance(tech, dict) else {}
+        parts.append(f"Tech count: {tech_count}.")
+        if researching:
+            fields = ", ".join(f"{k}: {v}" for k, v in researching.items())
+            parts.append(f"Researching: {fields}.")
+        parts.append("Build [cyan]research labs[/cyan]. Set Academic Privilege policy.")
+        if year > 2250:
+            parts.append("Prioritize [cyan]repeatables[/cyan] (+naval cap, +damage).")
+
+    elif action == "COLONIZE":
+        parts.append(f"Currently {colony_count} colonies.")
+        parts.append("Prioritize planets with [cyan]high habitability[/cyan] and rare features.")
+        parts.append("Set colony designation immediately for efficiency bonus.")
+
+    elif action == "PREPARE_WAR":
+        target = directive.target or "nearest rival"
+        parts.append(f"Target: {target}.")
+        parts.append("Claim their systems (influence cost). Build up fleet to 1.5x their power.")
+        parts.append("Set war economy edict before declaring.")
+
+    elif action == "BUILD_STARBASE":
+        parts.append("Upgrade starbases at [cyan]chokepoints[/cyan] and trade routes.")
+        parts.append("Anchorages for naval cap. Shipyards for build speed.")
+
+    elif action == "DIPLOMACY":
+        parts.append("Send envoys to improve relations. Consider migration pacts, research agreements.")
+        parts.append("Federations scale hard in 4.3 — consider forming one.")
+
+    elif action == "ESPIONAGE":
+        parts.append("Assign envoys to spy networks on rivals.")
+        parts.append("Smear campaigns weaken enemies. Gather intel before wars.")
+
+    elif action == "EXPAND":
+        parts.append("Claim unclaimed systems. Prioritize chokepoints and resource-rich systems.")
+        parts.append("Build science ships to survey adjacent systems.")
+
+    elif action == "DEFEND":
+        parts.append("Reinforce border starbases. Position fleets at chokepoints.")
+        parts.append("Consider defensive pacts with friendly neighbors.")
+
+    elif action == "CONSOLIDATE":
+        parts.append("Focus on stability. Upgrade buildings, clear blockers.")
+        parts.append("Address unemployment and housing on existing colonies.")
+
+    if reason:
+        parts.append(f"[dim]Reason: {reason}[/dim]")
+
+    return "\n".join(parts)
+
+
 @dataclass
 class EmpireConfig:
     """Static configuration for the AI-controlled empire."""
@@ -344,16 +443,12 @@ class GameLoopController:
             stellaris_dir = self._bridge_config.save_dir.parent
         self._writer.write_suggestion(payload, stellaris_dir)
 
-        # Store suggestion text for TUI display
-        action = directive.action
-        reason = directive.reason[:120]
-        self.stats.last_suggestion = f"[bold yellow]{action}[/bold yellow] — {reason}"
+        # Build constructive suggestion with specific actions
+        suggestion = _build_constructive_suggestion(directive, state, self._ruleset)
+        self.stats.last_suggestion = suggestion
 
         # Log the suggestion prominently
-        log.info(
-            ">>> SUGGESTION: %s — %s",
-            directive.action, directive.reason[:120],
-        )
+        log.info(">>> SUGGESTION: %s", suggestion)
 
     def _process_council(self, state: dict, event: str | None) -> Directive | None:
         """Run the multi-agent council pipeline on a state snapshot."""
@@ -502,6 +597,7 @@ class AILoopController:
         parallel_empires: bool = False,
         recorder: GameRecorder | None = None,
         fast_decisions: bool = True,
+        fast_cutoff_year: int = 2250,
     ) -> None:
         self._provider = provider or StubProvider()
         self._bridge_config = bridge_config or BridgeConfig()
@@ -514,6 +610,7 @@ class AILoopController:
         self._parallel_empires = parallel_empires
         self._recorder = recorder
         self._fast_decisions = fast_decisions
+        self._fast_cutoff_year = fast_cutoff_year
         self._running = False
 
         # Cache rulesets/personalities per country ID
@@ -838,8 +935,8 @@ class AILoopController:
                 action = "IMPROVE_ECONOMY"
                 reason = "Early economy ramp (fast path)"
 
-        # --- Mid transition (2220-2250): diversify ---
-        elif year < 2250:
+        # --- Mid transition (2220-cutoff): diversify ---
+        elif year < self._fast_cutoff_year:
             hostile = [
                 e for e in known_empires
                 if isinstance(e, dict)
@@ -848,7 +945,7 @@ class AILoopController:
             # Hostile neighbor → military
             if hostile and fleet_power < 2000:
                 action = "BUILD_FLEET"
-                reason = f"Hostile empire detected, fleet power low (fast path)"
+                reason = "Hostile empire detected, fleet power low (fast path)"
             # Tech behind pace (should have ~40+ by 2230, ~60+ by 2240)
             elif tech_count < (year - 2200) * 2.5:
                 action = "FOCUS_TECH"
@@ -869,11 +966,8 @@ class AILoopController:
                 # Non-trivial situation — let LLM decide
                 return None
 
-        # --- Post-2250: let LLM handle complex mid/late game ---
+        # --- Post-cutoff: let LLM handle complex mid/late game ---
         else:
-            return None
-
-        if action is None:
             return None
 
         directive = Directive(action=action, reason=reason)

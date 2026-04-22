@@ -157,47 +157,30 @@ def run_console(
         header.append(f" {short_provider}", style="")
         header.append(f" {_format_uptime(m.uptime_s)}", style="dim")
 
-        # Token rates table
+        # Token rates — 2 columns for narrow terminals
         tok_table = Table(show_header=False, expand=True, box=None, padding=(0, 1))
         tok_table.add_column(ratio=1)
         tok_table.add_column(ratio=1)
-        tok_table.add_column(ratio=1)
         tok_table.add_row(
-            f"Tok/s: [bold]{m.tokens_per_second:.0f}[/bold]",
-            f"Avg latency: [bold]{m.avg_latency_ms:.0f}ms[/bold]",
-            f"Last: [bold]{m.last_latency_ms:.0f}ms[/bold]",
-        )
-        tok_table.add_row(
-            f"Local calls: {m.local_calls}",
-            f"Online calls: {m.online_calls}",
-            f"Fallbacks: {m.fallbacks}",
-        )
-        tok_table.add_row(
-            f"Total tokens: {total_tokens:,}",
-            f"Cache: {cache_rate}",
-            f"LLM errors: {m.llm_errors}",
+            f"Tok/s:[bold]{m.tokens_per_second:.0f}[/bold] Avg:[bold]{m.avg_latency_ms:.0f}ms[/bold]",
+            f"Calls:{m.local_calls} Err:{m.llm_errors} Tok:{total_tokens:,}",
         )
 
-        # Decisions table
+        # Decisions — use Text objects to avoid markup issues
+        from rich.markup import escape
+        safe_last = escape(m.last_action) if m.last_action else "none"
+        dec_line1 = Text()
+        dec_line1.append(f"Ok:{m.decisions_made}", style="bold green")
+        dec_line1.append(f" Fail:{m.decisions_failed}", style="bold red")
+        dec_line1.append(f" ValErr:{m.validation_errors}")
+        dec_line2 = Text()
+        dec_line2.append("Last: ")
+        dec_line2.append(safe_last, style="bold")
+
         dec_table = Table(show_header=False, expand=True, box=None, padding=(0, 1))
         dec_table.add_column(ratio=1)
         dec_table.add_column(ratio=1)
-        dec_table.add_row(
-            f"Total: [bold green]{m.decisions_made}[/bold green]",
-            f"Failed: [bold red]{m.decisions_failed}[/bold red]",
-        )
-        dec_table.add_row(
-            f"Validated: {m.decisions_made - m.validation_errors}",
-            f"Val errors: {m.validation_errors}",
-        )
-        # Escape last_action to prevent Rich markup interpretation
-        from rich.markup import escape
-        safe_last = escape(m.last_action) if m.last_action else "none"
-        safe_hist = escape(_format_histogram(m.actions_histogram))
-        dec_table.add_row(
-            f"Last: [bold]{safe_last}[/bold]",
-            f"Actions: {safe_hist}",
-        )
+        dec_table.add_row(dec_line1, dec_line2)
 
         # Outcomes panel (only if scoring has started)
         outcomes_text = None
@@ -238,34 +221,30 @@ def run_console(
                 border_style="yellow",
             )
 
-        # Controls — use Text() to avoid Rich markup issues with brackets
+        # Controls — avoid [] brackets entirely (Rich interprets them as markup)
         controls = Text()
-        controls.append("[M]", style="bold cyan")
-        controls.append(f" {console_config.llm_mode.upper()} ", style="")
-        controls.append("[C]", style="bold cyan")
-        on = console_config.council_enabled
-        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
-        controls.append("[P]", style="bold cyan")
-        on = console_config.planner_enabled
-        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
-        controls.append("[R]", style="bold cyan")
-        on = console_config.recording_enabled
-        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
-        controls.append("[F]", style="bold cyan")
-        on = console_config.fast_decisions
-        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
+        controls.append("M:", style="bold cyan")
+        controls.append(f"{console_config.llm_mode.upper()} ", style="")
+        for label, on in [
+            ("C:", console_config.council_enabled),
+            ("P:", console_config.planner_enabled),
+            ("R:", console_config.recording_enabled),
+            ("F:", console_config.fast_decisions),
+        ]:
+            controls.append(label, style="bold cyan")
+            controls.append("ON " if on else "off ", style="green" if on else "dim")
         if log_file:
-            controls.append("[L]", style="bold cyan")
-            controls.append("Log ", style="")
-        controls.append("[Q]", style="bold red")
-        controls.append("Quit", style="")
+            controls.append("L:", style="bold cyan")
+            controls.append("log ", style="")
+        controls.append("Q:", style="bold red")
+        controls.append("quit", style="")
 
         # Assemble layout
         layout = Layout()
         panels = [
             Layout(Panel(header, style="bold"), size=3, name="header"),
-            Layout(Panel(tok_table, title="Token Rates"), size=5, name="tokens"),
-            Layout(Panel(dec_table, title="Decisions"), size=5, name="decisions"),
+            Layout(Panel(tok_table, title="Stats"), size=3, name="tokens"),
+            Layout(Panel(dec_table, title="Decisions"), size=3, name="decisions"),
         ]
         if suggestion_panel is not None:
             panels.append(Layout(suggestion_panel, size=8, name="suggestion"))

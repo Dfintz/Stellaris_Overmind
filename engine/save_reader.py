@@ -388,6 +388,11 @@ def _find_ai_countries(
     return result
 
 
+def _is_resolved_name(s: str) -> bool:
+    """Return True if the string is a usable display name (not a localization template)."""
+    return isinstance(s, str) and bool(s.strip()) and "%" not in s
+
+
 def _get_country_display_name(country: dict, fallback: str) -> str:
     """Extract a display name from a country dict.
 
@@ -396,26 +401,25 @@ def _get_country_display_name(country: dict, fallback: str) -> str:
     the government type + country ID for readability.
     """
     name = country.get("name", "")
+    if _is_resolved_name(name):
+        return str(name)
+
     if isinstance(name, dict):
-        # Complex name with key + variables
         key = name.get("key", "")
-        # Reject unresolved localization templates
-        if key and "%" not in key:
-            return str(key)
+        if _is_resolved_name(key):
+            return key
         # Try variables for a resolved value
         variables = name.get("variables", [])
         if isinstance(variables, list):
             for var in variables:
                 if isinstance(var, dict):
                     val = var.get("value", "")
-                    if isinstance(val, str) and val and "%" not in val:
+                    if _is_resolved_name(val):
                         return val
                     if isinstance(val, dict):
                         inner_key = val.get("key", "")
-                        if inner_key and "%" not in inner_key:
+                        if _is_resolved_name(inner_key):
                             return inner_key
-    if isinstance(name, str) and name and "%" not in name:
-        return name
 
     # Fall back to government type + ID
     gov = country.get("government", {})

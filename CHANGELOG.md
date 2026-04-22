@@ -1,5 +1,37 @@
 # Changelog
 
+## 2025-04-22 — Setup Wizard, Constructive Suggestions, Bug Fixes
+
+### Setup Wizard
+- **Interactive first-run wizard** (`engine/setup_wizard.py`) — auto-launches when no config.toml exists
+  - 6-step guided setup: Mode → Paths → LLM → Options → Recording → Summary
+  - Auto-discovers Stellaris install (scans Steam library on C:-H: drives)
+  - Auto-discovers user data (Documents/Paradox, supports OneDrive)
+  - Auto-detects running Ollama + available models
+  - Supports network LLM endpoints (ip:port, DNS names)
+  - Run manually: `python -m engine --setup`
+- **Configurable fast cutoff year** — `[target] fast_cutoff_year = 2250`
+
+### Constructive Player Suggestions
+- Player mode now shows specific, actionable advice instead of bare action names
+- BUILD_FLEET: weapon loadouts per game phase, alloy check
+- IMPROVE_ECONOMY: diagnoses low income areas, recommends districts
+- FOCUS_TECH: shows research count, current projects, priority guidance
+- PREPARE_WAR: target, fleet ratio, edict checklist
+- All 11 actions have phase-aware, detailed guidance
+
+### Bug Fixes
+- **Validator: None in known_systems** — chained `.get()` could produce None in set. Replaced with explicit loop
+- **json.dumps safety** — added `default=str` to prevent crashes on non-serializable ruleset values
+- **State type safety** — `in_progress` field checked with `isinstance(dict)` instead of truthy
+- **Name resolution** — extracted `_is_resolved_name()` helper for consistent localization handling
+- **Dead code** — removed unreachable `action is None` check in fast path
+- **TUI: Rich markup garbling** — Decisions panel uses `Text()` objects instead of f-string markup
+- **TUI: missing [F] label** — replaced bracket notation with `F:ON` to avoid Rich markup parsing
+- **Setup wizard: input validation** — error message only shown on invalid input
+
+---
+
 ## 2025-04-22 — Version-Aware Meta System
 
 ### Meta Management

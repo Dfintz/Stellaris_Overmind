@@ -117,8 +117,8 @@ def _domestic_state(state: dict) -> dict:
     tech = state.get("technology", {})
     if isinstance(tech, dict):
         compact["tech_count"] = tech.get("count", 0)
-        in_progress = tech.get("in_progress", {})
-        if in_progress:
+        in_progress = tech.get("in_progress")
+        if isinstance(in_progress, dict) and in_progress:
             compact["researching"] = in_progress
 
     traditions = state.get("traditions", [])
@@ -282,6 +282,11 @@ def _build_agent_prompt(
             f"ESPIONAGE: priority={espionage_phase.get('priority', 'low')}"
         )
 
+    try:
+        ruleset_json = json.dumps(compact_ruleset, separators=(',', ':'), default=str)
+    except (TypeError, ValueError):
+        ruleset_json = "{}"
+
     # Build empire strategy summary from ruleset base/modifiers
     strategy_parts = []
     base = ruleset.get("base", {})
@@ -317,7 +322,7 @@ def _build_agent_prompt(
         f"Empire: {empire_strategy} (tier {meta_tier})",
         meta_block,
         f"ALLOWED: {', '.join(ALLOWED_ACTIONS)}",
-        f"RULESET: {json.dumps(compact_ruleset, separators=(',', ':'))}",
+        f"RULESET: {ruleset_json}",
         f"PHASE: {phase['phase']} | FOCUS: {phase.get('economy_focus', '')}",
         domain_context,
     ]
