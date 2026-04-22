@@ -6,6 +6,9 @@ The AI plays within Stellaris 4.3.4 rules, respects fog‑of‑war, adapts to
 ethics/civics/traits/origins, and makes macro‑strategic decisions like a
 strong human player — live, without pausing the game.
 
+<img width="997" height="704" alt="image" src="https://github.com/user-attachments/assets/5abc40ef-2fa1-48e6-8660-5fb5e56e42f8" />
+
+
 ## Features
 
 - **Dual mode** — strategic advisor for the player; AI personality override for AI empires
