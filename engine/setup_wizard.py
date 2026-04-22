@@ -271,6 +271,80 @@ def run_wizard() -> dict:
     return config
 
 
+def install_mod(user_data_dir: str) -> bool:
+    """Install the Overmind mod into the Stellaris mod directory.
+
+    Creates a junction/symlink from the Stellaris mod folder to the project's
+    mod directory, writes the .mod descriptor, and ensures ai_bridge/ exists.
+
+    Returns True on success.
+    """
+    user_data = Path(user_data_dir)
+    mod_dir = user_data / "mod"
+    mod_target = mod_dir / "stellaris_overmind"
+    mod_desc_target = mod_dir / "stellaris_overmind.mod"
+    mod_source = _PROJECT_ROOT / "mod" / "stellaris_overmind"
+    bridge_dir = mod_source / "ai_bridge"
+
+    if not mod_source.exists():
+        print(f"  ERROR: Mod source not found: {mod_source}")
+        return False
+
+    # Ensure mod directory exists
+    mod_dir.mkdir(parents=True, exist_ok=True)
+
+    # Ensure ai_bridge directory exists
+    bridge_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create junction/symlink to mod folder
+    if not mod_target.exists():
+        print(f"  Linking mod: {mod_source} → {mod_target}")
+        try:
+            if sys.platform == "win32":
+                # Use junction (doesn't require admin on most Windows configs)
+                import subprocess
+                result = subprocess.run(
+                    ["cmd", "/c", "mklink", "/J", str(mod_target), str(mod_source)],
+                    capture_output=True, text=True,
+                )
+                if not mod_target.exists():
+                    # Junction failed — fall back to copy
+                    print("  Junction failed — copying mod files instead")
+                    import shutil
+                    shutil.copytree(str(mod_source), str(mod_target))
+            else:
+                mod_target.symlink_to(mod_source)
+        except Exception as exc:
+            print(f"  WARNING: Could not link mod: {exc}")
+            print(f"  Please manually copy {mod_source} to {mod_target}")
+            return False
+
+        if mod_target.exists():
+            print("  Mod linked successfully")
+        else:
+            print("  ERROR: Mod link/copy failed")
+            return False
+    else:
+        print("  Mod already installed")
+
+    # Write .mod descriptor with absolute path
+    abs_path = str(mod_target).replace("\\", "/")
+    descriptor = (
+        f'name="Stellaris Overmind"\n'
+        f'path="{abs_path}"\n'
+        f'tags={{\n'
+        f'\t"AI"\n'
+        f'\t"Gameplay"\n'
+        f'}}\n'
+        f'picture="thumbnail.png"\n'
+        f'supported_version="v4.*"\n'
+    )
+    mod_desc_target.write_text(descriptor, encoding="utf-8")
+    print(f"  Mod descriptor written: {mod_desc_target}")
+
+    return True
+
+
 def write_config(config: dict, path: Path | None = None) -> Path:
     """Write config dict to config.toml."""
     if path is None:
@@ -345,6 +419,16 @@ def write_config(config: dict, path: Path | None = None) -> Path:
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"\n  Config saved to: {path}")
+
+    # Install the mod into Stellaris
+    print("\n  Installing Stellaris mod...")
+    install_mod(config["user_data_dir"])
+
+    print("\n  Setup complete! Next steps:")
+    print("    1. Enable 'Stellaris Overmind' in the Stellaris launcher → Mods")
+    print("    2. Set autosave frequency to Monthly (Settings → Game)")
+    print("    3. Start a game, then run: python -m engine --console")
+
     return path
 
 

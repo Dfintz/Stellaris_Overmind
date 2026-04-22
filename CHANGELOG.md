@@ -9,6 +9,10 @@
   - Auto-discovers user data (Documents/Paradox, supports OneDrive)
   - Auto-detects running Ollama + available models
   - Supports network LLM endpoints (ip:port, DNS names)
+  - **Auto-installs mod** — creates junction/symlink in Stellaris mod folder, writes .mod descriptor, creates ai_bridge directory
+  - Falls back to file copy if junction fails (no admin needed)
+  - Run manually: `python -m engine --setup`
+  - Supports network LLM endpoints (ip:port, DNS names)
   - Run manually: `python -m engine --setup`
 - **Configurable fast cutoff year** — `[target] fast_cutoff_year = 2250`
 

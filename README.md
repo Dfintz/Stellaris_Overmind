@@ -47,8 +47,10 @@ The wizard will:
 4. Let you choose: AI mode or Player advisor mode
 5. Configure council, planner, fast decisions, recording
 6. Generate `config.toml` automatically
+7. **Install the mod** into your Stellaris mod folder (junction + descriptor)
 
 The wizard also runs automatically on first launch if no config exists.
+After setup, just enable "Stellaris Overmind" in the Stellaris launcher → Mods.
 
 Supports network LLM endpoints — enter `http://192.168.1.100:11434` for
 Ollama on another machine, or any OpenAI-compatible URL.
