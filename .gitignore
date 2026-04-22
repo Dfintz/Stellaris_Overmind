@@ -32,6 +32,10 @@ mod/stellaris_overmind/ai_bridge/directive.json
 mod/stellaris_overmind/ai_bridge/ack.json
 mod/ai_bridge/
 
+# AI assistant configuration (local only)
+.claude/
+.github/
+
 # IDE
 .vscode/
 .idea/
