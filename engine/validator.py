@@ -73,8 +73,19 @@ def validate_directive(
         )
 
     # --- 3. Fog-of-war: target visibility ---
-    if target is not None:
-        known_systems = set(state.get("colonies", []))
+    # In AI mode, targets are guidance for the native AI, not direct commands.
+    # Only EXPAND truly needs spatial validation (claiming specific systems).
+    # COLONIZE targets are planet suggestions the native AI interprets.
+    _SPATIAL_ACTIONS = {"EXPAND"}
+    # Empire-targeting actions must reference known empires
+    _EMPIRE_ACTIONS = {"DIPLOMACY", "ESPIONAGE", "PREPARE_WAR"}
+    if target is not None and action in _SPATIAL_ACTIONS:
+        raw_colonies = state.get("colonies", [])
+        known_systems = {
+            c.get("name") or c.get("system") or c.get("planet") or str(c)
+            if isinstance(c, dict) else c
+            for c in raw_colonies
+        }
         known_empires = {e.get("name") for e in state.get("known_empires", [])}
         # Also accept systems from known starbases and fleet locations
         known_fleet_systems = {
@@ -86,6 +97,23 @@ def validate_directive(
         if target not in known_targets:
             errors.append(
                 f"Target '{target}' is not in known systems or empires — "
+                "possible fog-of-war violation"
+            )
+
+    # --- 3b. Empire-targeting actions must reference known empires ---
+    # Skip if target contains unresolved localization keys (%ADJ% etc.)
+    if (
+        target is not None
+        and action in _EMPIRE_ACTIONS
+        and "%" not in target
+    ):
+        known_empires = {
+            e.get("name") for e in state.get("known_empires", [])
+            if isinstance(e, dict) and e.get("name")
+        }
+        if target not in known_empires:
+            errors.append(
+                f"Target empire '{target}' is not known — "
                 "possible fog-of-war violation"
             )
 

@@ -1211,6 +1211,25 @@ def get_espionage_phase_priority(year: int) -> dict:
 # Public API
 # ======================================================================== #
 
+def _normalize_key(raw: str, prefix: str) -> str:
+    """Convert Clausewitz IDs like ``ethic_fanatic_militarist`` to display
+    names like ``Fanatic Militarist`` that match the lookup tables.
+
+    Also handles already-normalized names (passes them through unchanged).
+    """
+    if raw in ("", None):
+        return raw or ""
+    # If it already matches a known format (starts uppercase), return as-is
+    if raw[0].isupper():
+        return raw
+    # Strip prefix (e.g. "ethic_", "civic_", "trait_", "origin_")
+    name = raw
+    if name.startswith(prefix):
+        name = name[len(prefix):]
+    # Convert underscores to spaces and title-case
+    return name.replace("_", " ").title()
+
+
 def generate_ruleset(
     ethics: list[str],
     civics: list[str],
@@ -1235,22 +1254,26 @@ def generate_ruleset(
 
     # Layer 1 – ethics base
     for ethic in ethics:
-        if ethic in ETHICS_BASE:
-            ruleset["base"].update(ETHICS_BASE[ethic])
+        key = _normalize_key(ethic, "ethic_")
+        if key in ETHICS_BASE:
+            ruleset["base"].update(ETHICS_BASE[key])
 
     # Layer 2 – civic modifiers
     for civic in civics:
-        if civic in CIVIC_MODIFIERS:
-            ruleset["modifiers"].update(CIVIC_MODIFIERS[civic])
+        key = _normalize_key(civic, "civic_")
+        if key in CIVIC_MODIFIERS:
+            ruleset["modifiers"].update(CIVIC_MODIFIERS[key])
 
     # Layer 3 – trait micro‑modifiers
     for trait in traits:
-        if trait in TRAIT_MICRO:
-            ruleset["micro_modifiers"].update(TRAIT_MICRO[trait])
+        key = _normalize_key(trait, "trait_")
+        if key in TRAIT_MICRO:
+            ruleset["micro_modifiers"].update(TRAIT_MICRO[key])
 
     # Layer 4 – origin overrides (highest priority)
-    if origin in ORIGIN_OVERRIDES:
-        overrides = ORIGIN_OVERRIDES[origin]
+    origin_key = _normalize_key(origin, "origin_")
+    if origin_key in ORIGIN_OVERRIDES:
+        overrides = ORIGIN_OVERRIDES[origin_key]
         ruleset["overrides"] = overrides
         # Promote meta info to top level
         if "meta_tier" in overrides:

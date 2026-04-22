@@ -16,8 +16,9 @@ arrives while the LLM is still thinking, the new snapshot takes priority.
 from __future__ import annotations
 
 import logging
+import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from engine.bridge import BridgeConfig, BridgeWriter, UnifiedBridge
 from engine.config import MultiAgentConfig, PlannerConfig
@@ -29,6 +30,25 @@ from engine.ruleset_generator import generate_ruleset
 from engine.validator import validate_directive
 
 log = logging.getLogger(__name__)
+
+_LOC_PATTERN = re.compile(r"%[A-Z_]+%")
+
+
+def _empire_display_name(state: dict, country_id: int) -> str:
+    """Extract a human-readable empire name from state, falling back to ID."""
+    name = state.get("empire", {}).get("name", "")
+    # Stellaris saves often contain unresolved localization keys like %ADJECTIVE%
+    if not name or _LOC_PATTERN.search(name):
+        # Try adjective or species as fallback
+        adj = state.get("empire", {}).get("adjective", "")
+        if adj and not _LOC_PATTERN.search(adj):
+            return adj
+        species = state.get("empire", {}).get("species", "")
+        if species:
+            return species
+        gov = state.get("empire", {}).get("government", "")
+        return f"{gov}#{country_id}" if gov else f"Empire#{country_id}"
+    return name
 
 
 @dataclass
@@ -54,6 +74,11 @@ class LoopStats:
     last_decision_time_ms: float = 0.0
     last_action: str = ""
     last_suggestion: str = ""
+    game_year: int = 0
+    scored_count: int = 0
+    avg_composite_score: float = 0.0
+    action_scores: dict[str, list[float]] = field(default_factory=dict)
+    empire_status: dict[str, str] = field(default_factory=dict)  # name → last action
 
 
 class GameLoopController:
@@ -186,6 +211,9 @@ class GameLoopController:
             return  # no new state — nothing to do
 
         self.stats.snapshots_processed += 1
+        year = snapshot.get("year", 0)
+        if year:
+            self.stats.game_year = year
 
         # Refresh ruleset if empire changed mid-game (government reform)
         self._maybe_refresh_ruleset(snapshot)
@@ -473,6 +501,7 @@ class AILoopController:
         multi_agent_config: MultiAgentConfig | None = None,
         parallel_empires: bool = False,
         recorder: GameRecorder | None = None,
+        fast_decisions: bool = True,
     ) -> None:
         self._provider = provider or StubProvider()
         self._bridge_config = bridge_config or BridgeConfig()
@@ -484,6 +513,7 @@ class AILoopController:
         self._multi_agent_config = multi_agent_config or MultiAgentConfig()
         self._parallel_empires = parallel_empires
         self._recorder = recorder
+        self._fast_decisions = fast_decisions
         self._running = False
 
         # Cache rulesets/personalities per country ID
@@ -522,6 +552,15 @@ class AILoopController:
                     exclude_fallen=self._exclude_fallen,
                 )
                 if states:
+                    # Update game year from first state
+                    year = states[0].get("year", 0)
+                    if year:
+                        self.stats.game_year = year
+                    # Retroactively score older decisions
+                    if self._recorder:
+                        updated = self._recorder.update_outcomes(states[0])
+                        if updated:
+                            self._score_completed_records()
                     self._process_all(states)
             except KeyboardInterrupt:
                 log.info("Interrupted — shutting down")
@@ -536,6 +575,40 @@ class AILoopController:
 
     def stop(self) -> None:
         self._running = False
+
+    def _score_completed_records(self) -> None:
+        """Score records that now have state_after filled."""
+        from engine.scorer import score_outcome
+
+        for rec in self._recorder.get_records():
+            if rec.state_after is not None and rec.outcome_scores is None:
+                cid = rec.state_before.get("country_id", 0)
+                ruleset = self._rulesets.get(cid, {})
+                scores = score_outcome(
+                    rec.state_before, rec.state_after, rec.decision, ruleset,
+                )
+                rec.outcome_scores = scores.to_dict()
+                rec.meta_alignment = scores.meta_alignment
+
+                action = rec.decision.get("action", "?")
+                if action not in self.stats.action_scores:
+                    self.stats.action_scores[action] = []
+                self.stats.action_scores[action].append(scores.composite)
+                self.stats.scored_count += 1
+
+                all_scores = [
+                    s for lst in self.stats.action_scores.values() for s in lst
+                ]
+                self.stats.avg_composite_score = (
+                    sum(all_scores) / len(all_scores) if all_scores else 0.0
+                )
+
+                empire_name = _empire_display_name(rec.state_before, cid)
+                log.info(
+                    "[%s] outcome scored: %s → %.2f (econ=%.2f fleet=%.2f meta=%.2f)",
+                    empire_name, action, scores.composite,
+                    scores.economy_delta, scores.fleet_delta, scores.meta_alignment,
+                )
 
     def process_states(self, states: list[dict]) -> list[Directive | None]:
         """Process a list of AI empire states.  For testing."""
@@ -626,6 +699,12 @@ class AILoopController:
             event = self._detect_event(country_id, state)
         self._previous_states[country_id] = state
 
+        # Fast code-only path for obvious early-game decisions (skips LLM)
+        if not event and self._fast_decisions:
+            fast = self._try_fast_decision(country_id, state, ruleset)
+            if fast is not None:
+                return fast
+
         # Multi-agent path
         if self._multi_agent_config.enabled:
             return self._process_council(country_id, state, event, ruleset, personality)
@@ -655,16 +734,19 @@ class AILoopController:
         result = validate_directive(directive.to_dict(), ruleset, state)
         if not result.valid:
             self.stats.validation_errors += 1
+            empire_name = _empire_display_name(state, country_id)
             log.warning(
-                "AI empire %d directive rejected: %s", country_id, result.errors,
+                "[%s] directive rejected: %s", empire_name, result.errors,
             )
             return None
 
         self.stats.decisions_made += 1
-        self.stats.last_action = directive.action
+        empire_name = _empire_display_name(state, country_id)
+        self.stats.last_action = f"{directive.action} ({empire_name})"
+        self.stats.empire_status[empire_name] = directive.action
         log.info(
-            "AI empire %d → %s (%.0fms)",
-            country_id, directive.action, self.stats.last_decision_time_ms,
+            "[%s] → %s (%.0fms)",
+            empire_name, directive.action, self.stats.last_decision_time_ms,
         )
         return directive
 
@@ -698,16 +780,116 @@ class AILoopController:
         vresult = validate_directive(directive.to_dict(), ruleset, state)
         if not vresult.valid:
             self.stats.validation_errors += 1
+            empire_name = _empire_display_name(state, country_id)
             log.warning(
-                "AI empire %d council rejected: %s", country_id, vresult.errors,
+                "[%s] council rejected: %s", empire_name, vresult.errors,
             )
             return None
 
         self.stats.decisions_made += 1
-        self.stats.last_action = directive.action
+        empire_name = _empire_display_name(state, country_id)
+        self.stats.last_action = f"{directive.action} ({empire_name})"
+        self.stats.empire_status[empire_name] = directive.action
         log.info(
-            "AI empire %d council → %s (%.0fms)",
-            country_id, directive.action, result.total_latency_ms,
+            "[%s] council → %s (%.0fms)",
+            empire_name, directive.action, result.total_latency_ms,
+        )
+        return directive
+
+    def _try_fast_decision(
+        self,
+        country_id: int,
+        state: dict,
+        ruleset: dict,
+    ) -> Directive | None:
+        """Return a code-only directive for situations where the optimal
+        action is clear from the game state.  Returns None to defer to LLM."""
+        year = state.get("year", 2200)
+        economy = state.get("economy", {})
+        fleets = state.get("fleets", [])
+        colonies = state.get("colonies", [])
+        known_empires = state.get("known_empires", [])
+        tech = state.get("technology", {})
+        fleet_power = sum(f.get("power", 0) for f in fleets) if fleets else 0
+        monthly = economy.get("monthly_net", {})
+        alloys = economy.get("alloys", 0)
+        minerals = economy.get("minerals", 0)
+        energy = economy.get("energy", 0)
+        colony_count = len(colonies) if isinstance(colonies, list) else 0
+        tech_count = tech.get("count", 0) if isinstance(tech, dict) else 0
+
+        action = None
+        reason = None
+
+        # --- Emergency: resource deficit ---
+        if energy < -10 or minerals < -15:
+            action = "IMPROVE_ECONOMY"
+            reason = "Critical resource deficit (fast path)"
+
+        # --- Early game (pre-2220): economy foundation ---
+        elif year < 2220:
+            if fleet_power < 500 and alloys > 30:
+                action = "BUILD_FLEET"
+                reason = "Minimal fleet for early defense (fast path)"
+            elif colony_count < 2 and year > 2210:
+                action = "COLONIZE"
+                reason = "Need initial expansion (fast path)"
+            else:
+                action = "IMPROVE_ECONOMY"
+                reason = "Early economy ramp (fast path)"
+
+        # --- Mid transition (2220-2250): diversify ---
+        elif year < 2250:
+            hostile = [
+                e for e in known_empires
+                if isinstance(e, dict)
+                and e.get("attitude", "").lower() in ("hostile", "belligerent")
+            ]
+            # Hostile neighbor → military
+            if hostile and fleet_power < 2000:
+                action = "BUILD_FLEET"
+                reason = f"Hostile empire detected, fleet power low (fast path)"
+            # Tech behind pace (should have ~40+ by 2230, ~60+ by 2240)
+            elif tech_count < (year - 2200) * 2.5:
+                action = "FOCUS_TECH"
+                reason = f"Tech count {tech_count} behind pace (fast path)"
+            # Can expand but haven't
+            elif colony_count < 4 and year < 2240:
+                action = "COLONIZE"
+                reason = f"Only {colony_count} colonies, should expand (fast path)"
+            # Alloy surplus → fleet
+            elif alloys > 300 and fleet_power < 3000:
+                action = "BUILD_FLEET"
+                reason = "Alloy surplus, convert to fleet power (fast path)"
+            # Economy weak
+            elif isinstance(monthly, dict) and monthly.get("energy", 0) < 10:
+                action = "IMPROVE_ECONOMY"
+                reason = "Monthly energy income too low (fast path)"
+            else:
+                # Non-trivial situation — let LLM decide
+                return None
+
+        # --- Post-2250: let LLM handle complex mid/late game ---
+        else:
+            return None
+
+        if action is None:
+            return None
+
+        directive = Directive(action=action, reason=reason)
+
+        result = validate_directive(directive.to_dict(), ruleset, state)
+        if not result.valid:
+            return None
+
+        self.stats.decisions_made += 1
+        self.stats.last_decision_time_ms = 0.0
+        empire_name = _empire_display_name(state, country_id)
+        self.stats.last_action = f"{directive.action} ({empire_name})⚡"
+        self.stats.empire_status[empire_name] = f"{directive.action}⚡"
+        log.info(
+            "[%s] fast → %s",
+            empire_name, directive.action,
         )
         return directive
 

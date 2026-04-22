@@ -99,6 +99,7 @@ class TargetConfig:
     ai_country_ids: list[int] = field(default_factory=list)  # empty = all AI
     ai_exclude_ids: list[int] = field(default_factory=list)  # skip these AIs
     ai_exclude_fallen: bool = True          # skip Fallen Empires by default
+    fast_decisions: bool = True             # code-only fast path for trivial decisions
 
 
 @dataclass
@@ -247,6 +248,7 @@ def _load_toml(path: Path, cfg: OvermindConfig) -> OvermindConfig:
         cfg.target.ai_country_ids = tgt.get("ai_country_ids", cfg.target.ai_country_ids)
         cfg.target.ai_exclude_ids = tgt.get("ai_exclude_ids", cfg.target.ai_exclude_ids)
         cfg.target.ai_exclude_fallen = tgt.get("ai_exclude_fallen", cfg.target.ai_exclude_fallen)
+        cfg.target.fast_decisions = tgt.get("fast_decisions", cfg.target.fast_decisions)
 
     # Multi-agent section
     if "multi_agent" in data:

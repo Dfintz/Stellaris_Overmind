@@ -13,6 +13,8 @@ import argparse
 import logging
 from pathlib import Path
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 from engine.bridge import BridgeConfig
 from engine.config import load_config
 from engine.game_loop import EmpireConfig, GameLoopController
@@ -145,6 +147,10 @@ def main() -> None:
         "--console", action="store_true",
         help="Launch Rich TUI dashboard instead of plain logging",
     )
+    parser.add_argument(
+        "--log-file", type=Path, default=None,
+        help="Write logs to file (auto-set to overmind.log when using --console)",
+    )
     args = parser.parse_args()
 
     # Load config
@@ -153,11 +159,25 @@ def main() -> None:
         cfg.llm.provider = args.provider
 
     # Setup logging
+    log_level = getattr(logging, cfg.log_level.upper(), logging.INFO)
     logging.basicConfig(
-        level=getattr(logging, cfg.log_level.upper(), logging.INFO),
+        level=log_level,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # When using --console, also write logs to a file for a parallel tail view
+    log_file = args.log_file
+    if args.console and log_file is None:
+        log_file = _PROJECT_ROOT / "overmind.log"
+    if log_file is not None:
+        file_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(name)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S",
+        ))
+        logging.getLogger().addHandler(file_handler)
+
     log = logging.getLogger("overmind")
 
     # Build provider
@@ -186,6 +206,11 @@ def main() -> None:
     if target_mode == "ai":
         # AI mode — control AI empires
         from engine.game_loop import AILoopController
+        from engine.recorder import GameRecorder
+
+        recorder = GameRecorder(
+            replay_dir=Path(cfg.training.replay_dir),
+        )
 
         controller = AILoopController(
             provider=provider,
@@ -196,6 +221,8 @@ def main() -> None:
             exclude_fallen=cfg.target.ai_exclude_fallen,
             multi_agent_config=cfg.multi_agent,
             parallel_empires=cfg.multi_agent.parallel,
+            recorder=recorder,
+            fast_decisions=cfg.target.fast_decisions,
         )
 
         log.info("=" * 60)
@@ -249,7 +276,7 @@ def main() -> None:
 
     # Launch with or without console TUI
     if args.console:
-        _run_with_console(controller, provider, cfg, target_mode)
+        _run_with_console(controller, provider, cfg, target_mode, log_file)
     else:
         controller.run()
 
@@ -259,6 +286,7 @@ def _run_with_console(
     provider: LLMProvider,
     cfg: object,
     target_mode: str,
+    log_file: Path | None = None,
 ) -> None:
     """Run the game loop in a background thread with the Rich TUI in foreground."""
     import threading
@@ -271,6 +299,8 @@ def _run_with_console(
         llm_mode=cfg.llm.mode,
         council_enabled=cfg.multi_agent.enabled,
         planner_enabled=cfg.planner.enabled,
+        recording_enabled=hasattr(controller, "_recorder") and controller._recorder is not None,
+        fast_decisions=cfg.target.fast_decisions,
     )
     stop_event = threading.Event()
 
@@ -286,8 +316,19 @@ def _run_with_console(
         while not stop_event.is_set():
             if hasattr(controller, "stats"):
                 metrics.update_from_loop(controller.stats)
+                metrics.update_settings(
+                    game_year=getattr(controller.stats, "game_year", None),
+                )
             if hasattr(provider, "stats"):
                 metrics.update_from_provider(provider.stats)
+            # Pull prompt cache stats if available
+            if hasattr(controller, "_prompt_cache"):
+                metrics.update_from_cache(controller._prompt_cache.stats)
+            elif hasattr(controller, "prompt_cache"):
+                metrics.update_from_cache(controller.prompt_cache.stats)
+            # Push TUI toggle back to controller
+            if hasattr(controller, "_fast_decisions"):
+                controller._fast_decisions = console_config.fast_decisions
             stop_event.wait(1.0)
 
     loop_thread = threading.Thread(target=_loop_thread, daemon=True)
@@ -302,6 +343,7 @@ def _run_with_console(
         stop_event=stop_event,
         provider_name=provider.name,
         target_mode=target_mode,
+        log_file=str(log_file) if log_file else None,
     )
 
     # Shutdown

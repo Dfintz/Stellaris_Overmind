@@ -98,10 +98,9 @@ def _filter_empire(state: dict) -> dict:
 
 
 def _domestic_state(state: dict) -> dict:
-    """Extract economy/tech/planet state for the domestic agent."""
+    """Extract economy/tech/planet state for the domestic agent (compact)."""
     compact: dict = {
         "year": state.get("year"),
-        "month": state.get("month"),
         "empire": _filter_empire(state),
         "economy": state.get("economy", {}),
     }
@@ -109,7 +108,11 @@ def _domestic_state(state: dict) -> dict:
     colonies = state.get("colonies", [])
     if isinstance(colonies, list):
         compact["colony_count"] = len(colonies)
-        compact["colonies"] = colonies[:10]
+        # Just names, not full colony data
+        compact["colonies"] = [
+            c.get("name", "?") if isinstance(c, dict) else str(c)
+            for c in colonies[:6]
+        ]
 
     tech = state.get("technology", {})
     if isinstance(tech, dict):
@@ -126,25 +129,8 @@ def _domestic_state(state: dict) -> dict:
     if isinstance(perks, list) and perks:
         compact["ascension_perks"] = perks
 
-    policies = state.get("policies", [])
-    if isinstance(policies, list) and policies:
-        compact["policies"] = {
-            p["policy"]: p["selected"]
-            for p in policies
-            if isinstance(p, dict) and "policy" in p
-        }
-
-    edicts = state.get("edicts", [])
-    if isinstance(edicts, list) and edicts:
-        compact["edicts"] = edicts
-
-    leaders = state.get("leaders", [])
-    if isinstance(leaders, list):
-        compact["leaders"] = [
-            {"class": ld.get("class", ""), "level": ld.get("level", 0)}
-            for ld in leaders
-            if isinstance(ld, dict) and ld.get("class") in ("governor", "scientist")
-        ]
+    # Skip policies/edicts/leaders — they don't drive macro decisions
+    # and save ~200 tokens
 
     # Minimal military awareness (just total power)
     fleets = state.get("fleets", [])
@@ -172,29 +158,19 @@ def _military_state(state: dict) -> dict:
 
     empires = state.get("known_empires", [])
     if isinstance(empires, list):
-        hostile = [e for e in empires if e.get("attitude") in ("hostile", "Hostile")]
-        others = [e for e in empires if e.get("attitude") not in ("hostile", "Hostile")]
-        compact["known_empires"] = (hostile + others)[:8]
+        # Just name + attitude, not full empire data
+        compact["known_empires"] = [
+            {"name": e.get("name", "?"), "attitude": e.get("attitude", "?")}
+            for e in empires[:6]
+        ]
 
     wars = state.get("wars", [])
     if isinstance(wars, list) and wars:
-        compact["wars"] = wars
-
-    starbases = state.get("starbases", [])
-    if isinstance(starbases, list) and starbases:
-        compact["starbases"] = starbases
+        compact["wars"] = wars[:3]
 
     nav_cap = state.get("naval_capacity", {})
     if isinstance(nav_cap, dict) and nav_cap:
         compact["naval_capacity"] = nav_cap
-
-    leaders = state.get("leaders", [])
-    if isinstance(leaders, list):
-        compact["leaders"] = [
-            {"class": ld.get("class", ""), "level": ld.get("level", 0)}
-            for ld in leaders
-            if isinstance(ld, dict) and ld.get("class") in ("admiral", "general")
-        ]
 
     # Minimal economic awareness (just key resources)
     economy = state.get("economy", {})
@@ -209,14 +185,16 @@ def _military_state(state: dict) -> dict:
 # Prompt Builders
 # ======================================================================== #
 
-_META_RULES = (
-    "CRITICAL 4.3 META RULES:\n"
-    "- Disruptors are DEAD. Never recommend them.\n"
-    "- Titan AoE beams are meta-defining. Split fleets to avoid enemy titan AoE.\n"
-    "- Autocannon + Plasma is the swarm meta for corvettes/destroyers.\n"
-    "- Stability bonuses are halved in 4.3.\n"
-    "- Job EFFICIENCY matters more than raw output.\n"
-    "- Minerals are the foundation resource early game."
+_META_DOMESTIC = (
+    "4.3.4 META: Job EFFICIENCY > raw output. Specialize planets (forge/research/factory). "
+    "Minerals = foundation early. Trade builds top-tier. Unity rush + ascension = strongest macro. "
+    "COLONIZE aggressively. FOCUS_TECH when behind. Stability bonuses halved."
+)
+
+_META_MILITARY = (
+    "4.3.4 META: Disruptors DEAD. Autocannon+Plasma = swarm meta. Titan AoE = meta-defining, split fleets. "
+    "Naval cap 5x (corvette=5, BB=40). BUILD_STARBASE at chokepoints. "
+    "DIPLOMACY for federations. ESPIONAGE for intel. PREPARE_WAR vs hostile neighbors."
 )
 
 
@@ -242,49 +220,105 @@ def _build_agent_prompt(
     if role == "domestic":
         system_msg = (
             "You are the DOMESTIC advisor for a Stellaris 4.3.4 empire. "
-            "You advise on economy, technology, planets, and internal stability. "
-            "Focus on: IMPROVE_ECONOMY, FOCUS_TECH, COLONIZE, CONSOLIDATE, ESPIONAGE."
+            "You advise on economy, technology, planets, and internal stability."
         )
-        tradition_guide = get_tradition_guidance(year)
+        tradition_guide = get_tradition_guidance(
+            year,
+            ethics=role_state.get("empire", {}).get("ethics", []),
+            adopted=role_state.get("traditions", []),
+        )
         ethics = role_state.get("empire", {}).get("ethics", [])
         policy_guide = get_policy_guidance(year, ethics)
         tech_guide = get_tech_priorities(year)
+
+        # Phase-aware action guidance to encourage diversity
+        if year < 2220:
+            action_hint = "Early game: prefer IMPROVE_ECONOMY or COLONIZE."
+        elif year < 2250:
+            action_hint = (
+                "Mid game: consider FOCUS_TECH if behind on research, "
+                "COLONIZE if < 5 colonies, ESPIONAGE if rivals are strong, "
+                "IMPROVE_ECONOMY only if income is weak."
+            )
+        else:
+            action_hint = (
+                "Late game: FOCUS_TECH for repeatables, CONSOLIDATE for stability, "
+                "ESPIONAGE for intel. IMPROVE_ECONOMY only if deficits."
+            )
+
         domain_context = (
+            f"PHASE GUIDANCE: {action_hint}\n"
             f"TRADITIONS: recommended={tradition_guide.get('recommended_trees', [])}\n"
-            f"POLICY RECOMMENDATIONS: {json.dumps(policy_guide.get('recommended', {}))}\n"
-            f"TECH PRIORITIES: {json.dumps(tech_guide.get('meta_notes', []))}"
+            f"POLICY: {json.dumps(policy_guide.get('recommended', {}))}\n"
+            f"TECH: {json.dumps(tech_guide.get('meta_notes', []))}"
         )
     else:
         system_msg = (
             "You are the MILITARY advisor for a Stellaris 4.3.4 empire. "
-            "You advise on fleets, wars, defense, diplomacy, and border security. "
-            "Focus on: BUILD_FLEET, PREPARE_WAR, DEFEND, EXPAND, BUILD_STARBASE, DIPLOMACY."
+            "You advise on fleets, wars, defense, diplomacy, and border security."
         )
         fleet_tmpl = get_fleet_template(year)
         sb_guide = get_starbase_guidance(year)
         espionage_phase = get_espionage_phase_priority(year)
+
+        if year < 2220:
+            action_hint = "Early game: BUILD_FLEET for initial defense, EXPAND to claim systems."
+        elif year < 2250:
+            action_hint = (
+                "Mid game: DIPLOMACY with neighbors, BUILD_STARBASE at chokepoints, "
+                "PREPARE_WAR if hostile neighbors, DEFEND if threatened. "
+                "Don't just BUILD_FLEET — consider strategic positioning."
+            )
+        else:
+            action_hint = (
+                "Late game: PREPARE_WAR for conquest, DIPLOMACY for federations, "
+                "DEFEND against crises, BUILD_STARBASE for anchorages."
+            )
+
         domain_context = (
+            f"PHASE GUIDANCE: {action_hint}\n"
             f"FLEET: {json.dumps(fleet_tmpl.composition)} | {fleet_tmpl.notes}\n"
             f"STARBASE: {sb_guide.get('priority', '')} | {sb_guide.get('notes', '')}\n"
             f"ESPIONAGE: priority={espionage_phase.get('priority', 'low')}"
         )
 
+    # Build empire strategy summary from ruleset base/modifiers
+    strategy_parts = []
+    base = ruleset.get("base", {})
+    mods = ruleset.get("modifiers", {})
+    overrides = ruleset.get("overrides", {})
+    if base.get("war_frequency"):
+        strategy_parts.append(f"war_tendency={base['war_frequency']}")
+    if base.get("diplomacy_tendency"):
+        strategy_parts.append(f"diplomacy={base['diplomacy_tendency']}")
+    if base.get("fleet_budget_share"):
+        strategy_parts.append(f"fleet_budget={base['fleet_budget_share']:.0%}")
+    if base.get("trade_focus"):
+        strategy_parts.append(f"trade_focus={base['trade_focus']}")
+    if base.get("tech_focus"):
+        strategy_parts.append(f"tech_focus={base['tech_focus']}")
+    if base.get("expansion_drive"):
+        strategy_parts.append(f"expansion={base['expansion_drive']}")
+    if mods.get("research_priority"):
+        strategy_parts.append(f"research={mods['research_priority']}")
+    if mods.get("fleet_priority"):
+        strategy_parts.append(f"fleet={mods['fleet_priority']}")
+    if mods.get("alloy_priority"):
+        strategy_parts.append(f"alloy={mods['alloy_priority']}")
+    if overrides.get("meta_strategy"):
+        strategy_parts.append(f"strategy={overrides['meta_strategy']}")
+    empire_strategy = " | ".join(strategy_parts) if strategy_parts else "standard"
+    meta_tier = ruleset.get("meta_tier", "C")
+    meta_block = _META_DOMESTIC if role == "domestic" else _META_MILITARY
+
     sections = [
         system_msg,
-        "You must recommend exactly ONE action from the allowed list.",
-        "You must include a CONFIDENCE score (0.0 to 1.0) based on how strongly you feel.",
-        "You must cite ruleset elements in your reason.",
-        "You must NOT reference mechanics that do not exist in Stellaris 4.3.4.",
-        "",
-        _META_RULES,
-        "",
-        f"ALLOWED ACTIONS: {', '.join(ALLOWED_ACTIONS)}",
-        "",
-        "EMPIRE RULESET:",
-        json.dumps(compact_ruleset, indent=2),
-        "",
-        f"GAME PHASE: {phase['phase']} | FOCUS: {phase.get('economy_focus', '')}",
-        "",
+        "Recommend exactly ONE action. CONFIDENCE (0.0-1.0). Cite ruleset.",
+        f"Empire: {empire_strategy} (tier {meta_tier})",
+        meta_block,
+        f"ALLOWED: {', '.join(ALLOWED_ACTIONS)}",
+        f"RULESET: {json.dumps(compact_ruleset, separators=(',', ':'))}",
+        f"PHASE: {phase['phase']} | FOCUS: {phase.get('economy_focus', '')}",
         domain_context,
     ]
 
@@ -294,8 +328,8 @@ def _build_agent_prompt(
 
     sections.extend([
         "",
-        "CURRENT STATE:",
-        json.dumps(role_state, indent=2),
+        "STATE:",
+        json.dumps(role_state, separators=(',', ':')),
     ])
 
     if event:
@@ -303,10 +337,10 @@ def _build_agent_prompt(
 
     sections.append(
         "\nRespond in EXACTLY this format:\n"
-        "ACTION: <one action from the allowed list>\n"
+        "ACTION: <one action>\n"
         "TARGET: <target or NONE>\n"
-        "CONFIDENCE: <0.0 to 1.0>\n"
-        "REASON: <must cite ruleset elements and meta rules>"
+        "CONFIDENCE: <0.0-1.0>\n"
+        "REASON: <cite ruleset>"
     )
     return "\n".join(sections)
 

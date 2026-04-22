@@ -1213,15 +1213,72 @@ SITUATIONS: dict[str, dict] = {
 # Public API
 # ======================================================================== #
 
-def get_tradition_guidance(year: int, ethics: list[str] | None = None) -> dict:
-    """Return tradition tree recommendations for the current game phase."""
+def get_tradition_guidance(
+    year: int,
+    ethics: list[str] | None = None,
+    adopted: list[str] | None = None,
+) -> dict:
+    """Return tradition tree recommendations based on phase, ethics, and adopted trees.
+
+    Parameters
+    ----------
+    year : int
+        Current in-game year.
+    ethics : list[str] | None
+        Empire's ethics (Clausewitz IDs or display names).
+    adopted : list[str] | None
+        Already-adopted tradition tree names (to exclude from recommendations).
+    """
     phase = _phase_from_year(year)
-    recommended = TRADITION_PHASE_GUIDANCE.get(phase.value, [])
+    phase_recs = list(TRADITION_PHASE_GUIDANCE.get(phase.value, []))
+
+    # Ethics-based priority adjustments
+    ethics_set = {e.lower().replace("ethic_", "").replace("fanatic_", "") for e in (ethics or [])}
+
+    ethics_tree_boost: dict[str, list[str]] = {
+        "militarist": ["Supremacy", "Enmity"],
+        "pacifist": ["Harmony", "Diplomacy", "Prosperity"],
+        "xenophile": ["Diplomacy", "Commerce", "Politics"],
+        "xenophobe": ["Domination", "Expansion", "Supremacy"],
+        "authoritarian": ["Domination", "Supremacy"],
+        "egalitarian": ["Diplomacy", "Prosperity", "Commerce"],
+        "materialist": ["Discovery", "Aptitude"],
+        "spiritualist": ["Harmony", "Domination"],
+    }
+
+    # Boost ethics-appropriate trees to the front
+    boosted: list[str] = []
+    for ethic in ethics_set:
+        for tree in ethics_tree_boost.get(ethic, []):
+            if tree not in boosted:
+                boosted.append(tree)
+
+    # Merge: boosted first (if phase-appropriate), then phase recs
+    merged: list[str] = []
+    for tree in boosted:
+        if tree not in merged:
+            merged.append(tree)
+    for tree in phase_recs:
+        if tree not in merged:
+            merged.append(tree)
+
+    # Filter out already-adopted traditions
+    if adopted:
+        adopted_lower = {t.lower() for t in adopted}
+        merged = [t for t in merged if t.lower() not in adopted_lower]
+
+    # Annotate with meta notes
+    notes = {}
+    for name in merged[:5]:
+        tree = TRADITION_TREES.get(name, {})
+        priority = tree.get("meta_priority", "")
+        adopt_bonus = tree.get("adopt", "")
+        notes[name] = f"{priority} | adopt: {adopt_bonus}"
 
     return {
         "phase": phase.value,
-        "recommended_trees": recommended,
-        "notes": {name: TRADITION_TREES[name].get("meta_priority", "") for name in recommended if name in TRADITION_TREES},
+        "recommended_trees": merged[:5],
+        "notes": notes,
     }
 
 

@@ -25,6 +25,33 @@ from engine.llm_provider import LLMProvider, LLMProviderError, LLMResponse
 log = logging.getLogger(__name__)
 
 
+class _SimpleProviderStats:
+    """Lightweight stats tracker for non-hybrid providers."""
+
+    __slots__ = ("local_calls", "online_calls", "local_failures",
+                 "online_failures", "local_tokens", "online_tokens", "fallbacks")
+
+    def __init__(self) -> None:
+        self.local_calls = 0
+        self.online_calls = 0
+        self.local_failures = 0
+        self.online_failures = 0
+        self.local_tokens = 0
+        self.online_tokens = 0
+        self.fallbacks = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "local_calls": self.local_calls,
+            "online_calls": self.online_calls,
+            "local_failures": self.local_failures,
+            "online_failures": self.online_failures,
+            "local_tokens": self.local_tokens,
+            "online_tokens": self.online_tokens,
+            "fallbacks": self.fallbacks,
+        }
+
+
 class QwenVLLMProvider(LLMProvider):
     """Talk to a local Qwen2.5-Omni instance via the vLLM OpenAI-compat API."""
 
@@ -41,6 +68,7 @@ class QwenVLLMProvider(LLMProvider):
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._timeout_s = timeout_s
+        self.stats = _SimpleProviderStats()
 
     # ------------------------------------------------------------------ #
     # LLMProvider interface
@@ -74,13 +102,16 @@ class QwenVLLMProvider(LLMProvider):
         except (KeyError, IndexError) as exc:
             raise LLMProviderError(f"Unexpected vLLM response shape: {data}") from exc
 
-        return LLMResponse(
+        response = LLMResponse(
             text=text.strip(),
             model=data.get("model", self._model),
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
             latency_ms=latency,
         )
+        self.stats.local_calls += 1
+        self.stats.local_tokens += response.prompt_tokens + response.completion_tokens
+        return response
 
     def is_available(self) -> bool:
         try:
@@ -147,6 +178,7 @@ class OpenAICompatProvider(LLMProvider):
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._timeout_s = timeout_s
+        self.stats = _SimpleProviderStats()
 
     def complete(self, prompt: str) -> LLMResponse:
         payload = {
@@ -175,13 +207,16 @@ class OpenAICompatProvider(LLMProvider):
         except (KeyError, IndexError) as exc:
             raise LLMProviderError(f"Unexpected response: {data}") from exc
 
-        return LLMResponse(
+        response = LLMResponse(
             text=text.strip(),
             model=data.get("model", self._model),
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
             latency_ms=latency,
         )
+        self.stats.local_calls += 1
+        self.stats.local_tokens += response.prompt_tokens + response.completion_tokens
+        return response
 
     def is_available(self) -> bool:
         try:

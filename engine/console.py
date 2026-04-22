@@ -32,6 +32,7 @@ class ConsoleConfig:
     council_enabled: bool = False
     planner_enabled: bool = False
     recording_enabled: bool = False
+    fast_decisions: bool = True
 
 
 class LogCapture(logging.Handler):
@@ -64,12 +65,36 @@ def _format_histogram(hist: dict[str, int], max_items: int = 6) -> str:
     return " ".join(parts)
 
 
+def _open_log_tail(log_file: str) -> None:
+    """Open a new terminal window tailing the log file."""
+    import subprocess
+    import sys
+
+    path = str(log_file)
+    try:
+        if sys.platform == "win32":
+            # PowerShell in a new window, tailing the log file
+            subprocess.Popen(
+                ["powershell", "-NoExit", "-Command",
+                 f"Write-Host 'Overmind Log Viewer — {path}' -ForegroundColor Cyan; "
+                 f"Get-Content '{path}' -Wait -Tail 50"],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+        else:
+            # Unix: try to open a new terminal
+            subprocess.Popen(["tail", "-f", "-n", "50", path])
+        log.info("Opened log viewer: %s", path)
+    except Exception as exc:
+        log.warning("Could not open log viewer: %s", exc)
+
+
 def run_console(
     metrics_collector: object,
     console_config: ConsoleConfig,
     stop_event: threading.Event,
     provider_name: str = "unknown",
     target_mode: str = "player",
+    log_file: str | None = None,
 ) -> None:
     """Run the Rich TUI dashboard.  Blocks until ``stop_event`` is set.
 
@@ -84,7 +109,9 @@ def run_console(
     provider_name : str
         Display name of the LLM provider.
     target_mode : str
-        "player" or "ai".
+        \"player\" or \"ai\".
+    log_file : str | None
+        Path to log file for parallel tail view.
     """
     try:
         from rich.console import Console
@@ -116,18 +143,19 @@ def run_console(
             if cache_total > 0 else "N/A"
         )
 
-        # Header
-        header = Text.assemble(
-            ("STELLARIS OVERMIND", "bold cyan"),
-            ("  │  ", "dim"),
-            (f"Mode: {target_mode.upper()}", "bold"),
-            ("  │  ", "dim"),
-            (f"Provider: {provider_name}", ""),
-            ("  │  ", "dim"),
-            (f"Year: {m.game_year}", "bold yellow"),
-            ("  │  ", "dim"),
-            (f"Uptime: {_format_uptime(m.uptime_s)}", "dim"),
-        )
+        # Header — compact for narrow terminals
+        short_provider = provider_name
+        if "(" in short_provider and ")" in short_provider:
+            short_provider = short_provider.split("(")[1].rstrip(")")
+
+        year_str = str(m.game_year) if m.game_year > 0 else "---"
+
+        header = Text()
+        header.append("OVERMIND", style="bold cyan")
+        header.append(f" Y:{year_str}", style="bold yellow")
+        header.append(f" {target_mode.upper()}", style="bold")
+        header.append(f" {short_provider}", style="")
+        header.append(f" {_format_uptime(m.uptime_s)}", style="dim")
 
         # Token rates table
         tok_table = Table(show_header=False, expand=True, box=None, padding=(0, 1))
@@ -162,42 +190,75 @@ def run_console(
             f"Validated: {m.decisions_made - m.validation_errors}",
             f"Val errors: {m.validation_errors}",
         )
+        # Escape last_action to prevent Rich markup interpretation
+        from rich.markup import escape
+        safe_last = escape(m.last_action) if m.last_action else "none"
+        safe_hist = escape(_format_histogram(m.actions_histogram))
         dec_table.add_row(
-            f"Last: [bold]{m.last_action or 'none'}[/bold]",
-            f"Actions: {_format_histogram(m.actions_histogram)}",
+            f"Last: [bold]{safe_last}[/bold]",
+            f"Actions: {safe_hist}",
         )
 
-        # Log panel
+        # Outcomes panel (only if scoring has started)
+        outcomes_text = None
+        if m.scored_count > 0:
+            sign = "+" if m.avg_composite_score >= 0 else ""
+            parts = [f"Scored: {m.scored_count}  Avg: {sign}{m.avg_composite_score:.3f}"]
+            for act, avg in sorted(m.action_scores.items()):
+                s = "+" if avg >= 0 else ""
+                parts.append(f"{act}={s}{avg:.2f}")
+            outcomes_text = "  ".join(parts)
+
+        # Empire status board — shows each empire and their current action
+        from rich.markup import escape
+        empire_table = None
+        if m.empire_status:
+            empire_table = Table(
+                show_header=True, expand=True, box=None, padding=(0, 1),
+            )
+            empire_table.add_column("Empire", ratio=2, no_wrap=True)
+            empire_table.add_column("Action", ratio=2, no_wrap=True)
+
+            for name, action in sorted(m.empire_status.items()):
+                empire_table.add_row(escape(name), escape(action))
+
+        # Log panel — last 8 lines only (compact)
         log_lines = list(log_capture.records)
-        log_text = "\n".join(log_lines[-15:]) if log_lines else "[dim]Waiting for events...[/dim]"
+        visible = log_lines[-8:] if log_lines else []
+        while len(visible) < 4:
+            visible.append("")
+        log_text = "\n".join(visible)
 
         # Suggestion panel (player mode only)
         suggestion_panel = None
         if target_mode == "player" and m.last_suggestion:
             suggestion_panel = Panel(
                 m.last_suggestion,
-                title="[bold yellow]Suggestion[/bold yellow]",
+                title="Suggestion",
                 border_style="yellow",
             )
 
-        # Controls
-        mode_display = console_config.llm_mode.upper()
-        controls = Text.assemble(
-            ("[M]", "bold cyan"), (f" Mode: {mode_display}  ", ""),
-            ("[C]", "bold cyan"), (" Council: ", ""),
-            ("ON" if console_config.council_enabled else "OFF",
-             "green" if console_config.council_enabled else "dim"),
-            ("  ", ""),
-            ("[P]", "bold cyan"), (" Planner: ", ""),
-            ("ON" if console_config.planner_enabled else "OFF",
-             "green" if console_config.planner_enabled else "dim"),
-            ("  ", ""),
-            ("[R]", "bold cyan"), (" Record: ", ""),
-            ("ON" if console_config.recording_enabled else "OFF",
-             "green" if console_config.recording_enabled else "dim"),
-            ("  ", ""),
-            ("[Q]", "bold red"), (" Quit", ""),
-        )
+        # Controls — use Text() to avoid Rich markup issues with brackets
+        controls = Text()
+        controls.append("[M]", style="bold cyan")
+        controls.append(f" {console_config.llm_mode.upper()} ", style="")
+        controls.append("[C]", style="bold cyan")
+        on = console_config.council_enabled
+        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
+        controls.append("[P]", style="bold cyan")
+        on = console_config.planner_enabled
+        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
+        controls.append("[R]", style="bold cyan")
+        on = console_config.recording_enabled
+        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
+        controls.append("[F]", style="bold cyan")
+        on = console_config.fast_decisions
+        controls.append(f"{'ON' if on else 'OFF'} ", style="green" if on else "dim")
+        if log_file:
+            controls.append("[L]", style="bold cyan")
+            controls.append("Log ", style="")
+        controls.append("[Q]", style="bold red")
+        controls.append("Quit", style="")
 
         # Assemble layout
         layout = Layout()
@@ -208,8 +269,18 @@ def run_console(
         ]
         if suggestion_panel is not None:
             panels.append(Layout(suggestion_panel, size=8, name="suggestion"))
+        if outcomes_text is not None:
+            panels.append(Layout(
+                Panel(outcomes_text, title="Outcomes", border_style="magenta"),
+                size=3, name="outcomes",
+            ))
+        if empire_table is not None:
+            panels.append(Layout(
+                Panel(empire_table, title="Empires"),
+                name="empires",
+            ))
         panels.extend([
-            Layout(Panel(log_text, title="Log"), name="log"),
+            Layout(Panel(log_text, title="Log"), size=6, name="log"),
             Layout(Panel(controls), size=3, name="controls"),
         ])
         layout.split_column(*panels)
@@ -265,6 +336,14 @@ def run_console(
         elif key == "r":
             console_config.recording_enabled = not console_config.recording_enabled
             log.info("Recording: %s", "ON" if console_config.recording_enabled else "OFF")
+        elif key == "f":
+            console_config.fast_decisions = not console_config.fast_decisions
+            log.info("Fast decisions: %s", "ON" if console_config.fast_decisions else "OFF")
+        elif key == "l":
+            if log_file:
+                _open_log_tail(log_file)
+            else:
+                log.info("No log file configured — restart with --log-file <path>")
 
     # Start key listener thread
     key_thread = threading.Thread(target=_key_listener, daemon=True)
@@ -272,10 +351,10 @@ def run_console(
 
     # Main display loop
     try:
-        with Live(build_display(), console=console, refresh_per_second=2, screen=True) as live:
+        with Live(build_display(), console=console, refresh_per_second=1, screen=True) as live:
             while not stop_event.is_set():
                 live.update(build_display())
-                stop_event.wait(0.5)
+                stop_event.wait(1.0)
     except KeyboardInterrupt:
         stop_event.set()
     finally:

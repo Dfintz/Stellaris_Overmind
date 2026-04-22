@@ -365,18 +365,41 @@ def _find_ai_countries(
 
 
 def _get_country_display_name(country: dict, fallback: str) -> str:
-    """Extract a display name from a country dict."""
+    """Extract a display name from a country dict.
+
+    Stellaris saves often store names as localization templates like
+    ``%ADJECTIVE% Empire``.  When we can't resolve those, fall back to
+    the government type + country ID for readability.
+    """
     name = country.get("name", "")
     if isinstance(name, dict):
         # Complex name with key + variables
         key = name.get("key", "")
-        if key:
+        # Reject unresolved localization templates
+        if key and "%" not in key:
             return str(key)
-        meta_name = name.get("meta", {}).get("name", "")
-        if meta_name:
-            return str(meta_name)
-    if isinstance(name, str) and name:
+        # Try variables for a resolved value
+        variables = name.get("variables", [])
+        if isinstance(variables, list):
+            for var in variables:
+                if isinstance(var, dict):
+                    val = var.get("value", "")
+                    if isinstance(val, str) and val and "%" not in val:
+                        return val
+                    if isinstance(val, dict):
+                        inner_key = val.get("key", "")
+                        if inner_key and "%" not in inner_key:
+                            return inner_key
+    if isinstance(name, str) and name and "%" not in name:
         return name
+
+    # Fall back to government type + ID
+    gov = country.get("government", {})
+    gov_type = ""
+    if isinstance(gov, dict):
+        gov_type = str(gov.get("type", ""))
+    if gov_type:
+        return f"{gov_type}#{fallback}"
     return f"Empire_{fallback}"
 
 

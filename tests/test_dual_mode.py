@@ -446,6 +446,7 @@ class TestAIMultiAgent:
             provider=StubProvider(),
             bridge_config=BridgeConfig(bridge_dir=Path("")),
             multi_agent_config=MultiAgentConfig(enabled=True, parallel=False),
+            fast_decisions=False,
         )
         controller.process_states(states)
         assert 1 in controller._councils

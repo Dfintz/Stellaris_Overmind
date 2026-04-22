@@ -1,6 +1,8 @@
 # Secrets & local config
 .env
 config.toml
+overmind.log
+*.log
 
 # Python
 __pycache__/

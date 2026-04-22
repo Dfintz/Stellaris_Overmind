@@ -195,6 +195,7 @@ class TestDomesticState:
         assert ds["total_fleet_power"] == 1500
 
     def test_filters_leaders_to_domestic(self) -> None:
+        """Leaders excluded from domestic state for token efficiency."""
         state = {
             "year": 2210,
             "leaders": [
@@ -204,10 +205,8 @@ class TestDomesticState:
             ],
         }
         ds = _domestic_state(state)
-        classes = [ld["class"] for ld in ds.get("leaders", [])]
-        assert "governor" in classes
-        assert "scientist" in classes
-        assert "admiral" not in classes
+        # Leaders excluded to save tokens — macro decisions don't need them
+        assert "leaders" not in ds
 
 
 class TestMilitaryState:
@@ -229,6 +228,7 @@ class TestMilitaryState:
         assert ms["alloys"] == 30
 
     def test_filters_leaders_to_military(self) -> None:
+        """Leaders excluded from military state for token efficiency."""
         state = {
             "year": 2210,
             "leaders": [
@@ -238,10 +238,8 @@ class TestMilitaryState:
             ],
         }
         ms = _military_state(state)
-        classes = [ld["class"] for ld in ms.get("leaders", [])]
-        assert "admiral" in classes
-        assert "general" in classes
-        assert "governor" not in classes
+        # Leaders excluded to save tokens — macro decisions don't need them
+        assert "leaders" not in ms
 
 
 # ======================================================================== #
@@ -260,7 +258,7 @@ class TestAgentPrompts:
         )
         assert "DOMESTIC advisor" in prompt
         assert "IMPROVE_ECONOMY" in prompt
-        assert "ALLOWED ACTIONS" in prompt
+        assert "ALLOWED" in prompt
         assert "4.3.4" in prompt
 
     def test_military_prompt_contains_fleet_focus(
@@ -290,7 +288,7 @@ class TestAgentPrompts:
         prompt = _build_agent_prompt(
             "military", state, imperial_ruleset, imperial_personality, None,
         )
-        assert "Disruptors are DEAD" in prompt
+        assert "Disruptors DEAD" in prompt
 
 
 # ======================================================================== #

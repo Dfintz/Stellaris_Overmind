@@ -53,6 +53,14 @@ class DashboardMetrics:
     game_year: int = 0
     last_suggestion: str = ""
 
+    # Outcome tracking
+    scored_count: int = 0
+    avg_composite_score: float = 0.0
+    action_scores: dict[str, float] = field(default_factory=dict)
+
+    # Empire status board
+    empire_status: dict[str, str] = field(default_factory=dict)
+
     def to_dict(self) -> dict:
         total_calls = self.local_calls + self.online_calls
         total_tokens = self.local_tokens + self.online_tokens
@@ -121,8 +129,29 @@ class MetricsCollector:
         self._metrics.validation_errors = getattr(loop_stats, "validation_errors", 0)
         self._metrics.snapshots_processed = getattr(loop_stats, "snapshots_processed", 0)
         self._metrics.last_action = getattr(loop_stats, "last_action", "")
-        self._metrics.last_latency_ms = getattr(loop_stats, "last_decision_time_ms", 0.0)
         self._metrics.last_suggestion = getattr(loop_stats, "last_suggestion", "")
+
+        # Feed latency into the rolling deque for avg calculation
+        last_ms = getattr(loop_stats, "last_decision_time_ms", 0.0)
+        if last_ms > 0 and last_ms != self._metrics.last_latency_ms:
+            self._latencies.append(last_ms)
+        self._metrics.last_latency_ms = last_ms
+
+        # Outcome scores
+        self._metrics.scored_count = getattr(loop_stats, "scored_count", 0)
+        self._metrics.avg_composite_score = getattr(loop_stats, "avg_composite_score", 0.0)
+        raw_action_scores = getattr(loop_stats, "action_scores", {})
+        if raw_action_scores:
+            self._metrics.action_scores = {
+                act: sum(scores) / len(scores)
+                for act, scores in raw_action_scores.items()
+                if scores
+            }
+
+        # Empire status board — accumulate, don't replace
+        raw_status = getattr(loop_stats, "empire_status", None)
+        if raw_status:
+            self._metrics.empire_status.update(raw_status)
 
     def update_from_provider(self, provider_stats: object) -> None:
         """Pull stats from a ProviderStats dataclass (or dict)."""
@@ -176,9 +205,12 @@ class MetricsCollector:
             m.avg_latency_ms = sum(self._latencies) / len(self._latencies)
 
         # Tokens per second
+        total_tokens = m.local_tokens + m.online_tokens
         if self._token_times:
             total_tok = sum(t for t, _ in self._token_times)
             total_ms = sum(ms for _, ms in self._token_times)
             m.tokens_per_second = (total_tok / total_ms * 1000) if total_ms > 0 else 0.0
+        elif total_tokens > 0 and m.uptime_s > 0:
+            m.tokens_per_second = total_tokens / m.uptime_s
 
         return m

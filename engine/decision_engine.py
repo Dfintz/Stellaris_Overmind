@@ -90,8 +90,10 @@ def build_prompt(
                  "meta_tier", "meta_strategy")
     }
 
-    tradition_guide = get_tradition_guidance(year)
     ethics = state.get("empire", {}).get("ethics", [])
+    tradition_guide = get_tradition_guidance(
+        year, ethics=ethics, adopted=state.get("traditions", []),
+    )
     policy_guide = get_policy_guidance(year, ethics)
     perk_guide = get_ascension_perk_guidance(tier=0)
     tech_guide = get_tech_priorities(year)
