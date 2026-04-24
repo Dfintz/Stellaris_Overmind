@@ -309,10 +309,28 @@ Stellaris community. Thanks to the following people, projects, and tools.
 
 ### Stellaris community (meta & strategy)
 - **[stellaris-build.com](https://stellaris-build.com)** — community build database + tier lists
-- **Aktion** (YouTube) — ship combat testing, weapon verdicts
+- **[Aktion — "We Tested 200+ Ship Builds"](https://www.youtube.com/watch?v=KRlRjbOg0Ag)** — ship & combat meta source for `docs/META_4.3.4.md`
+- **[KaelGotRice — "4.3 Meta: Strongest Builds"](https://www.youtube.com/watch?v=KsQA9-SrKD8)** — build & origin meta source for `docs/META_4.3.4.md`
 - **Stefan Anon** (YouTube) — economy/empire optimization guides
 - **MontuPlays** (YouTube) — patch breakdowns and meta analysis
 - **r/Stellaris** and the Stellaris Modding Den (Discord) — countless tips
+
+### Stellaris modding & save-parsing tools
+- **[stellaris-dashboard](https://github.com/eliasdoehne/stellaris-dashboard)** (Elias Doehne) — reference for high-performance Rust save parsing (maturin + jomini); cited in [engine/clausewitz_parser.py](engine/clausewitz_parser.py)
+- **[jomini](https://github.com/rakaly/jomini)** (Rakaly) — Rust crate for Paradox script/save parsing — perf benchmark reference
+- **[Rakaly save analyzer](https://rakaly.com/)** — community save inspection used to validate parsed-state shape
+- **[CWTools](https://github.com/cwtools/cwtools)** + **[Paradox Script VSCode extension](https://github.com/cwtools/cwtools-vscode)** — Clausewitz syntax highlighting / validation while authoring `mod/`
+- **[Irony Mod Manager](https://github.com/bcssov/IronyModManager)** — mod testing & conflict checks
+
+### MCP servers (dev-time enrichment)
+The engine integrates with MCP servers for ruleset/meta authoring (not at runtime — runtime meta must remain curated). Wired in [engine/mcp_client.py](engine/mcp_client.py):
+- **[Meme-Theory/stellaris-wiki-mcp](https://github.com/Meme-Theory/stellaris-wiki-mcp)** — structured Stellaris Wiki access (`wiki_game_data`, `wiki_search`, `wiki_patch_notes`); used by `create_wiki_client()`
+- **[Meme-Theory/stellaris-save-mcp](https://github.com/Meme-Theory/stellaris-save-mcp)** — empire budgets, tech trees, ship designs (`save_empires`, `save_empire_detail`, `game_version`); used by `create_save_client()`
+- **[Model Context Protocol](https://modelcontextprotocol.io/)** (Anthropic) — protocol spec
+- **[GitHub MCP Server](https://github.com/github/github-mcp-server)** — used during development for repo operations
+- **[Microsoft Docs MCP](https://learn.microsoft.com/)** — Azure / Foundry documentation lookup during integration
+
+Other Stellaris MCP servers exist (e.g. [bmassemin/stellaris-mcp](https://github.com/bmassemin/stellaris-mcp), [megidragon/stellaris-mcp-interface](https://github.com/megidragon/stellaris-mcp-interface)) but are not used here — our own bridge in `mod/stellaris_overmind/ai_bridge/` handles real-time game state under our fog-of-war + action-whitelist constraints.
 
 ### LLM runtimes
 - **[Ollama](https://ollama.com)** — local LLM serving (default backend)
