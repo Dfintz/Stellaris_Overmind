@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.4.0 — 2026-04-24 — Public Repo Hardening & Community Credits
+
+### Security & Supply Chain
+- **SECURITY.md** — vulnerability disclosure policy and scope
+- **MIT LICENSE** — formal license file matching `pyproject.toml`
+- **Dependabot** — weekly pip + GitHub Actions updates, grouped minor/patch
+- **CodeQL workflow** — `security-extended` + `security-and-quality` query suites on push, PR, and weekly cron
+- **CI workflow** — ruff + mypy (informational) and pytest (gating) across Python 3.11 and 3.12
+- **pip-audit job** — third-party dependency vulnerability scan (excludes editable self-install)
+
+### Documentation
+- **Credits & Community Resources** section in `README.md` covering Stellaris community wikis, modding tools (CWTools, Irony, stellaris-dashboard, jomini, Rakaly), Python ecosystem, training stack, and security/CI tooling
+- **MCP servers credited** — Meme-Theory's `stellaris-wiki-mcp` and `stellaris-save-mcp` linked explicitly with note on architecture compatibility
+
 ## 2026-04-22 — LM Studio Support, Model Selection, Security & FoW Fixes
 
 ### LM Studio Integration
