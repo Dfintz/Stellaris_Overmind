@@ -323,12 +323,14 @@ Stellaris community. Thanks to the following people, projects, and tools.
 - **[Irony Mod Manager](https://github.com/bcssov/IronyModManager)** — mod testing & conflict checks
 
 ### MCP servers (dev-time enrichment)
-The engine integrates with MCP servers for ruleset/meta authoring (not at runtime). Wired in [engine/mcp_client.py](engine/mcp_client.py):
-- **`stellaris-wiki-mcp`** — `wiki_game_data`, `wiki_search`, `wiki_patch_notes` for meta authoring
-- **`stellaris-save-mcp`** — `save_empires`, `save_empire_detail`, `game_version` for save inspection
+The engine integrates with MCP servers for ruleset/meta authoring (not at runtime — runtime meta must remain curated). Wired in [engine/mcp_client.py](engine/mcp_client.py):
+- **[Meme-Theory/stellaris-wiki-mcp](https://github.com/Meme-Theory/stellaris-wiki-mcp)** — structured Stellaris Wiki access (`wiki_game_data`, `wiki_search`, `wiki_patch_notes`); used by `create_wiki_client()`
+- **[Meme-Theory/stellaris-save-mcp](https://github.com/Meme-Theory/stellaris-save-mcp)** — empire budgets, tech trees, ship designs (`save_empires`, `save_empire_detail`, `game_version`); used by `create_save_client()`
 - **[Model Context Protocol](https://modelcontextprotocol.io/)** (Anthropic) — protocol spec
 - **[GitHub MCP Server](https://github.com/github/github-mcp-server)** — used during development for repo operations
 - **[Microsoft Docs MCP](https://learn.microsoft.com/)** — Azure / Foundry documentation lookup during integration
+
+Other Stellaris MCP servers exist (e.g. [bmassemin/stellaris-mcp](https://github.com/bmassemin/stellaris-mcp), [megidragon/stellaris-mcp-interface](https://github.com/megidragon/stellaris-mcp-interface)) but are not used here — our own bridge in `mod/stellaris_overmind/ai_bridge/` handles real-time game state under our fog-of-war + action-whitelist constraints.
 
 ### LLM runtimes
 - **[Ollama](https://ollama.com)** — local LLM serving (default backend)
