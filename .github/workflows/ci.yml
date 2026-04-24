@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-type-test:
+    name: Lint, Type-check, Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install project (dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ruff (lint, informational)
+        run: ruff check .
+        continue-on-error: true
+
+      - name: Ruff (format check, informational)
+        run: ruff format --check .
+        continue-on-error: true
+
+      - name: mypy (strict, informational)
+        run: mypy --strict engine training
+        continue-on-error: true
+
+      - name: pytest
+        run: pytest -q
+
+  pip-audit:
+    name: pip-audit (dependency vulnerabilities)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install pip-audit and project
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          pip install -e ".[training,console,tracking,dev]" || pip install -e ".[dev]"
+
+      - name: Run pip-audit
+        run: pip-audit --strict --progress-spinner off

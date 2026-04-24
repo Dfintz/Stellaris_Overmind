@@ -297,6 +297,61 @@ python scripts/scaffold_meta.py --list
                                                └───────────┘
 ```
 
+## Credits & Community Resources
+
+This project would not exist without the open-source ecosystem and the
+Stellaris community. Thanks to the following people, projects, and tools.
+
+### Game & official sources
+- **Paradox Development Studio** — [Stellaris](https://www.stellaris.com/) and the Clausewitz engine
+- **[Stellaris Paradox Wiki](https://stellaris.paradoxwikis.com/)** — modding reference, scopes, effects, on_actions, ship designer
+- **[Paradox Modding Forums](https://forum.paradoxplaza.com/forum/forums/stellaris-mods.900/)** — event scripting reference
+
+### Stellaris community (meta & strategy)
+- **[stellaris-build.com](https://stellaris-build.com)** — community build database + tier lists
+- **Aktion** (YouTube) — ship combat testing, weapon verdicts
+- **Stefan Anon** (YouTube) — economy/empire optimization guides
+- **MontuPlays** (YouTube) — patch breakdowns and meta analysis
+- **r/Stellaris** and the Stellaris Modding Den (Discord) — countless tips
+
+### LLM runtimes
+- **[Ollama](https://ollama.com)** — local LLM serving (default backend)
+- **[LM Studio](https://lmstudio.ai)** — GUI LLM host with OpenAI-compatible API
+- **[vLLM](https://github.com/vllm-project/vllm)** — high-throughput Docker inference
+- **[TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)** — optional accelerated profile
+- **[Qwen2.5](https://qwenlm.github.io/)** (Alibaba) — primary model family
+- **[OpenRouter](https://openrouter.ai/)**, **[Together AI](https://www.together.ai/)**, **[Groq](https://groq.com/)**, **[Azure AI Foundry](https://ai.azure.com/)** — supported cloud endpoints
+
+### Python ecosystem
+- **[Rich](https://github.com/Textualize/rich)** — TUI dashboard rendering
+- **[pytest](https://pytest.org/)** — 464+ test suite
+- **[ruff](https://github.com/astral-sh/ruff)** — linting + formatting
+- **[mypy](https://mypy-lang.org/)** — strict static type checking
+
+### Training & fine-tuning stack
+- **[Hugging Face Transformers / Datasets / Accelerate](https://huggingface.co/)** — model + data tooling
+- **[PEFT](https://github.com/huggingface/peft)** — LoRA / QLoRA adapters
+- **[TRL](https://github.com/huggingface/trl)** — SFT and DPO trainers
+- **[bitsandbytes](https://github.com/bitsandbytes-foundation/bitsandbytes)** — 4/8-bit quantization
+- **[Unsloth](https://github.com/unslothai/unsloth)** — optional 2× faster LoRA training
+- **[GPTQ](https://github.com/IST-DASLab/gptq)** / **[AWQ](https://github.com/mit-han-lab/llm-awq)** — post-training quantization
+- **[Weights & Biases](https://wandb.ai/)** — optional experiment tracking
+
+### Security & CI
+- **[CodeQL](https://codeql.github.com/)** — static security analysis
+- **[Dependabot](https://github.com/dependabot)** — dependency updates
+- **[pip-audit](https://github.com/pypa/pip-audit)** — vulnerability scanning
+- **[Snyk](https://snyk.io/)** / **[SonarQube](https://www.sonarsource.com/)** — code quality during development
+
+### Tooling used to build this project
+- **[Visual Studio Code](https://code.visualstudio.com/)** with **[GitHub Copilot](https://github.com/features/copilot)** and **[Claude Code](https://www.anthropic.com/claude-code)** (Anthropic) — paired-AI development workflow
+- **[GitHub Actions](https://github.com/features/actions)** — CI/CD
+
+If we missed your tool or guide, please open an issue or PR — we want to credit you.
+
+---
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
