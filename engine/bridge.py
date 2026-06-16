@@ -285,11 +285,17 @@ class BridgeWriter:
             commands.extend([
                 "# Build mining/generator districts on planets with free slots",
                 "effect every_owned_planet = {",
-                "    limit = { free_district_slots > 0 num_districts = { type = district_mining value < 10 } }",
+                (
+                    "    limit = { free_district_slots > 0 "
+                    "num_districts = { type = district_mining value < 10 } }"
+                ),
                 "    add_district = district_mining",
                 "}",
                 "effect every_owned_planet = {",
-                "    limit = { free_district_slots > 0 num_districts = { type = district_generator value < 10 } }",
+                (
+                    "    limit = { free_district_slots > 0 "
+                    "num_districts = { type = district_generator value < 10 } }"
+                ),
                 "    add_district = district_generator",
                 "}",
                 "# Build alloy foundry on capital if possible",

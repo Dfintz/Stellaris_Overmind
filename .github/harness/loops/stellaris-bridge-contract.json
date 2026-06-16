@@ -1,0 +1,14 @@
+{
+  "name": "stellaris-bridge-contract",
+  "kind": "convergence",
+  "description": "Protect save-reader/bridge/setup contract and version-lock behavior while fixing regressions.",
+  "maxIterations": 5,
+  "checks": [
+    { "name": "bridge contract tests", "run": "{{commands.testBridgeContract}}", "timeoutMs": 1200000 },
+    { "name": "version-lock tests", "run": "{{commands.testVersionLock}}", "timeoutMs": 900000 },
+    { "name": "full lint", "run": "{{commands.lint}}", "timeoutMs": 900000 },
+    { "name": "full tests", "run": "{{commands.test}}", "timeoutMs": 1800000 }
+  ],
+  "instructions": ["CLAUDE.md", "docs/PROJECT_OVERVIEW.md"],
+  "skills": []
+}

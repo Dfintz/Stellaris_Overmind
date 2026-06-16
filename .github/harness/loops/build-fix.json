@@ -1,0 +1,23 @@
+{
+  "name": "build-fix",
+  "kind": "convergence",
+  "description": "Lint, type-check, and build until everything is green.",
+  "maxIterations": 4,
+  "checks": [
+    { "name": "lint", "run": "{{commands.lint}}", "timeoutMs": 600000 },
+    {
+      "name": "type-check",
+      "run": "{{commands.typeCheck}}",
+      "timeoutMs": 600000
+    },
+    { "name": "build", "run": "{{commands.build}}", "timeoutMs": 1200000 }
+  ],
+  "skills": [],
+  "instructions": [".github/instructions/04-IMPLEMENT.md"],
+  "fixPrompt": "The checks above failed with the attached output. Fix the root cause of each lint, type, or build error. Prefer the project's auto-fix command for trivially auto-fixable lint issues, then re-check.",
+  "guardrails": [
+    "Never silence an error with a suppression comment (e.g. type-checker ignores, lint-disable) — fix the underlying type or code.",
+    "Never weaken compiler or linter configuration to converge."
+  ],
+  "onExhausted": "Stop. Report each remaining error verbatim, which files were changed per iteration, and the suspected root cause for anything still red."
+}

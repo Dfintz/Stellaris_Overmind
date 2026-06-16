@@ -1,0 +1,26 @@
+{
+  "name": "diagnose",
+  "kind": "workflow",
+  "description": "Disciplined diagnosis of a hard bug or performance regression: reproduce → minimize → hypothesize → instrument → fix root cause → regression-test. Workflow loop — run natively; the value is evidence-driven discipline that refuses guess-fixing.",
+  "maxIterations": 5,
+  "checks": [],
+  "rubric": [
+    "The failure is reproduced deterministically (a failing test or a written, repeatable repro) before any fix.",
+    "The repro is minimized to the smallest input/code surface that still fails.",
+    "At least one falsifiable hypothesis about the cause was stated BEFORE changing production code.",
+    "Evidence (instrumentation, logs, a probe) confirmed or refuted each hypothesis — no fixes applied on a guess.",
+    "The ROOT cause is named, distinct from the symptom.",
+    "A regression test was added that fails before the fix and passes after.",
+    "The fix targets the root cause; the minimized repro and the regression test both pass."
+  ],
+  "skills": ["testing"],
+  "instructions": [".github/instructions/04-IMPLEMENT.md"],
+  "fixPrompt": "Each iteration advances the diagnosis, it does not jump to a fix. (1) REPRODUCE the failure deterministically. (2) MINIMIZE it to the smallest failing surface. (3) HYPOTHESIZE one falsifiable cause. (4) INSTRUMENT to gather evidence that confirms or refutes it — follow the evidence, do not pattern-match a fix. (5) Once the root cause is proven, add a regression test that fails now, then FIX the root cause and watch it pass. Record per iteration: the hypothesis, the evidence, and the verdict. Converge only when the root cause is named and the regression test passes.",
+  "guardrails": [
+    "No fix is applied before a hypothesis has been confirmed by evidence — guess-fixing is the failure mode this loop exists to prevent.",
+    "Fix the root cause, not the symptom; if you cannot name the root cause, you are not ready to fix.",
+    "The regression test must be observed to FAIL before the fix, or it does not prove the fix works.",
+    "Do not silence the symptom (swallow the error, widen a timeout, add a retry) and call it fixed."
+  ],
+  "onExhausted": "Stop. Report the reproduced failure, the minimized case, the hypotheses tried with the evidence for/against each, the leading remaining hypothesis, and exactly what to instrument next. Do not apply a speculative fix to end the loop."
+}

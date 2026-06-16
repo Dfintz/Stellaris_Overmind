@@ -1,0 +1,13 @@
+{
+  "name": "stellaris-fow-guard",
+  "kind": "convergence",
+  "description": "Keep fog-of-war guarantees and action whitelist safety green before and after changes.",
+  "maxIterations": 5,
+  "checks": [
+    { "name": "fog-of-war tests", "run": "{{commands.testFow}}", "timeoutMs": 1200000 },
+    { "name": "validator whitelist tests", "run": "{{commands.testWhitelist}}", "timeoutMs": 900000 },
+    { "name": "type-check engine", "run": "{{commands.typeCheck}}", "timeoutMs": 900000 }
+  ],
+  "instructions": ["CLAUDE.md", "docs/PROJECT_OVERVIEW.md"],
+  "skills": []
+}

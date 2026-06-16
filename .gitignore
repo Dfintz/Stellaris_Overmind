@@ -39,3 +39,8 @@ mod/ai_bridge/
 # OS
 Thumbs.db
 .DS_Store
+
+# Harness run journals and eval results (generated)
+.github/harness/runs/
+training/eval_results/
+

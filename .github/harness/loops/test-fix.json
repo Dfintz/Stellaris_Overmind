@@ -1,0 +1,18 @@
+{
+  "name": "test-fix",
+  "kind": "convergence",
+  "description": "Run the test suite(s) and fix failures until green.",
+  "maxIterations": 5,
+  "checks": [
+    { "name": "tests", "run": "{{commands.test}}", "timeoutMs": 1800000 }
+  ],
+  "skills": [],
+  "instructions": [".github/instructions/04-IMPLEMENT.md"],
+  "fixPrompt": "The test run above failed with the attached output. For each failure decide first: is the test wrong, or is the code wrong? Fix the one that violates the documented behavior. Re-run only the affected files first to iterate quickly, but the loop checks always run the full suite.",
+  "guardrails": [
+    "Never skip, delete, or weaken a failing test to converge — fix the cause.",
+    "Never loosen an assertion without evidence the original assertion was wrong.",
+    "Do not add real network calls or remove mocks of external services to make a test pass."
+  ],
+  "onExhausted": "Stop. Report each remaining failing test with its error output, what was attempted per iteration, and whether the failure looks like a test bug, a code bug, or an environment issue."
+}

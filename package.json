@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "name": "stellaris-overmind-harness",
+  "scripts": {
+    "harness:exp": "node scripts/harness/run-experiment.mjs",
+    "harness:mcp:server": "node scripts/harness/mcp-server.mjs",
+    "harness:report": "node scripts/harness/harness-report.mjs",
+    "harness:run": "node scripts/harness/run-loop.mjs",
+    "harness:selftest": "node scripts/harness/selftest-all.mjs",
+    "harness:mcp:tools": "node scripts/harness/mcp-tools.mjs list-tools",
+    "harness:record": "node scripts/harness/record-run.mjs",
+    "harness:loops": "node scripts/harness/run-loop.mjs --list",
+    "harness:doctor": "node scripts/harness/doctor.mjs",
+    "harness:exp:list": "node scripts/harness/run-experiment.mjs --list"
+  }
+}
+

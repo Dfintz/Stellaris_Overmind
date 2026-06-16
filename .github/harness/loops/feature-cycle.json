@@ -1,0 +1,31 @@
+{
+  "name": "feature-cycle",
+  "kind": "workflow",
+  "description": "Run the full harness stage machine (Understand -> Architect -> Implement -> Review -> Feedback) for a feature until reviews are clean and validation is green.",
+  "maxIterations": 2,
+  "checks": [],
+  "rubric": [
+    "Stage 0 ran: graph freshness checked and a component/layer impact map exists.",
+    "Stage 1 ran: an Architecture Brief exists with gate decisions, constraints, and Do-NOTs.",
+    "Stage 2 ran: the implementation followed the Brief and its self-review checklist is complete.",
+    "The inner review-fix loop reached terminal state 'converged'.",
+    "The validation matrix is green for every touched scope.",
+    "The completion summary includes the Understand status line (graph status, tools used, residual risk)."
+  ],
+  "skills": ["understand-process", "full-stack-feature"],
+  "instructions": [
+    ".github/instructions/02-UNDERSTAND-WORKFLOW.md",
+    ".github/instructions/03-ARCHITECT.md",
+    ".github/instructions/04-IMPLEMENT.md",
+    ".github/instructions/05-REVIEW-BREADTH.md",
+    ".github/instructions/06-REVIEW-DEPTH.md",
+    ".github/instructions/07-FEEDBACK.md"
+  ],
+  "fixPrompt": "Each iteration runs the stage machine from .github/harness/HARNESS.md: (0) Understand — graph freshness and impact map. (1) Architect — gates 1-5, produce the Architecture Brief. (2) Implement — follow the Brief with discovery and self-review, loading the domain skills the change touches (backend-service, frontend-component, testing, etc.). (3+4) Run the review-fix loop (loops/review-fix.json) as the inner loop. (5) Close out per 07-FEEDBACK if review challenged Brief decisions. The cycle converges when the inner review-fix loop converges AND the validation matrix for all touched scopes is green. A second iteration of this outer loop happens only if review-depth invalidates the Brief itself.",
+  "guardrails": [
+    "Do not skip stage 0 or stage 1 for non-trivial work — implementing without a Brief invalidates the cycle.",
+    "Artifacts carry forward: the Brief feeds Implement and Review-Depth; breadth findings feed depth.",
+    "End with the Understand status line (graph status, tools used, residual risk)."
+  ],
+  "onExhausted": "Stop. The Brief has been invalidated twice — report the conflicting gate decisions and ask the user to arbitrate the architecture before any further implementation."
+}

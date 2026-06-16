@@ -1,0 +1,29 @@
+{
+  "name": "review-fix",
+  "kind": "workflow",
+  "description": "Review the current change (breadth then depth) and fix findings until no Blocker or Major findings remain.",
+  "maxIterations": 3,
+  "checks": [],
+  "rubric": [
+    "The breadth review pass (05) was run against the current diff this iteration, not a prior one.",
+    "The depth review pass (06) was run with the breadth findings and Architecture Brief as input.",
+    "Zero findings of severity Blocker remain.",
+    "Zero findings of severity Major remain.",
+    "Every fix applied this iteration was itself re-reviewed, not just confirmed absent from the old findings list.",
+    "The validation matrix commands for all touched scopes pass."
+  ],
+  "skills": ["testing"],
+  "instructions": [
+    ".github/instructions/05-REVIEW-BREADTH.md",
+    ".github/instructions/06-REVIEW-DEPTH.md",
+    ".github/instructions/07-FEEDBACK.md",
+    ".github/instructions/04-IMPLEMENT.md"
+  ],
+  "fixPrompt": "Each iteration: (1) Run the breadth review pass (05-REVIEW-BREADTH) over the current diff. (2) Run the depth review pass (06-REVIEW-DEPTH) with the breadth findings pasted in to avoid duplication; include the Architecture Brief if one exists. (3) If no Blocker or Major findings remain, the loop converges — Minor/Nit findings are reported, not iterated on. (4) Otherwise, fix the Blocker and Major findings per 04-IMPLEMENT, re-running the validation matrix for touched scopes, then start the next iteration. If a finding challenges an Architecture Brief decision, evaluate it via 07-FEEDBACK before changing the design.",
+  "guardrails": [
+    "Findings are fixed, not argued away — unless a 07-FEEDBACK evaluation produces a 'decision holds' verdict with evidence.",
+    "Do not re-architect beyond what the findings require; scope creep restarts review from zero.",
+    "Reviews in later iterations must re-examine the fixes themselves, not just confirm the old findings are gone."
+  ],
+  "onExhausted": "Stop. Report the remaining Blocker/Major findings, the fix attempted for each, and why it did not resolve. Recommend whether the change needs a human review or a return to the Architect stage."
+}

@@ -1,0 +1,23 @@
+{
+  "name": "_template",
+  "kind": "convergence",
+  "description": "Copy this file to <name>.json. One sentence describing what 'done' means.",
+  "maxIterations": 3,
+  "checks": [
+    {
+      "name": "example-check",
+      "run": "echo replace-me && exit 1",
+      "timeoutMs": 300000
+    }
+  ],
+  "rubric": [
+    "Workflow loops only: list explicit, independently gradeable done-criteria here. Delete for convergence loops."
+  ],
+  "skills": [],
+  "instructions": [],
+  "fixPrompt": "Describe exactly what the agent should do with the failure output of each check. Reference the loaded skills for patterns. Fix root causes only.",
+  "guardrails": [
+    "Name the specific shortcuts this loop must never take to converge."
+  ],
+  "onExhausted": "Stop. Report the final state of every check, what was attempted in each iteration, and the suspected root cause. Do not retry."
+}

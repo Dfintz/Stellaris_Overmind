@@ -1,0 +1,12 @@
+{
+  "name": "stellaris-meta-verify",
+  "kind": "convergence",
+  "description": "Validate AI Radar patch/meta updates against strategic knowledge tests, version-lock tests, and safety invariants.",
+  "maxIterations": 5,
+  "checks": [
+    { "name": "meta audit", "run": "{{commands.metaAudit}}", "timeoutMs": 900000 },
+    { "name": "strategic knowledge tests", "run": "{{commands.metaTests}}", "timeoutMs": 1200000 },
+    { "name": "version-lock tests", "run": "{{commands.versionLockTests}}", "timeoutMs": 900000 },
+    { "name": "safety tests", "run": "{{commands.safetyTests}}", "timeoutMs": 1200000 }
+  ]
+}

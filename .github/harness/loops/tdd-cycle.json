@@ -1,0 +1,25 @@
+{
+  "name": "tdd-cycle",
+  "kind": "workflow",
+  "description": "Build a feature or fix a bug one vertical slice at a time with strict red-green-refactor: a failing test FIRST, watch it fail, minimal code to pass, refactor green. Workflow loop — run natively (the script runner refuses workflow loops); the discipline is process, not a single command.",
+  "maxIterations": 5,
+  "checks": [],
+  "rubric": [
+    "For the current slice, a new test was written BEFORE any production code changed.",
+    "The new test was observed to FAIL for the right reason (red) before the implementation — a test that passed immediately proves nothing.",
+    "The implementation is the minimal code that makes the failing test pass (green), not a speculative build-out.",
+    "The full test suite passes after the slice.",
+    "Any refactor kept every test green and changed no behaviour.",
+    "No test was deleted, skipped, weakened, or had an assertion loosened to reach green."
+  ],
+  "skills": ["testing"],
+  "instructions": [".github/instructions/04-IMPLEMENT.md"],
+  "fixPrompt": "Take the next smallest vertical slice of the feature/bugfix. (1) RED: write one test that expresses the slice's behaviour and run it — confirm it FAILS for the intended reason. (2) GREEN: write the minimal production code to make it pass; run the suite. (3) REFACTOR: clean up while keeping every test green. Record per iteration: the slice, the test added, the red failure observed, and the green result. Then start the next slice. Converge when the feature/bugfix is complete and the whole suite is green.",
+  "guardrails": [
+    "Never write production code for a slice before its failing test exists and has been seen to fail.",
+    "Never delete, skip, or weaken a test (or loosen an assertion) to reach green — fix the code.",
+    "One slice per iteration — do not batch multiple behaviours into a single red-green step.",
+    "The refactor step may not change behaviour; if a test goes red during refactor, the refactor is wrong, not the test."
+  ],
+  "onExhausted": "Stop. Report which slices are done (with their tests) and which remain, the current suite status, and the suspected blocker for the incomplete slice. Do not claim done on unwritten or failing tests."
+}

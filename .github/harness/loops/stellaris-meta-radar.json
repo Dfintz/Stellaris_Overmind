@@ -1,0 +1,14 @@
+{
+  "name": "stellaris-meta-radar",
+  "kind": "workflow",
+  "description": "Use AI Radar to absorb latest Stellaris patch/meta deltas and produce structured rule updates with confidence tags.",
+  "maxIterations": 4,
+  "checks": [],
+  "rubric": [
+    { "item": "Latest patch version identified and recorded", "pass": false },
+    { "item": "Meta deltas split into high-confidence vs uncertain", "pass": false },
+    { "item": "Proposed rule updates are explicit and testable", "pass": false },
+    { "item": "No fog-of-war or whitelist safety regressions introduced", "pass": false },
+    { "item": "Version-lock implications called out", "pass": false }
+  ]
+}

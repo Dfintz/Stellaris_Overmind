@@ -1,0 +1,25 @@
+{
+  "name": "lint-debt-experiment",
+  "kind": "experiment",
+  "description": "Example autoresearch-style experiment: iteratively edit ONE file, keeping only edits that lower a numeric metric (here: lint warning count). Configure the metric and target in harness.config.json.",
+  "maxIterations": 8,
+  "noImprovementStop": 3,
+  "metric": {
+    "name": "warning-count",
+    "run": "{{experiments.exampleMetricCommand}}",
+    "extract": "(\\d+) problems",
+    "direction": "minimize",
+    "timeoutMs": 900000
+  },
+  "target": ["{{experiments.exampleTarget}}"],
+  "skills": [],
+  "instructions": [".github/instructions/04-IMPLEMENT.md"],
+  "fixPrompt": "Lower the metric by fixing real issues in the target file (e.g. add explicit types, guard unsafe stringification, reorder imports). Fix the underlying issue — the metric measures the whole project, so only genuine fixes in the target move it. Make one focused, reviewable change per iteration.",
+  "guardrails": [
+    "Edit ONLY the declared target file — the runner reverts the target on regression but does NOT revert edits elsewhere.",
+    "Never add suppression comments (type-checker ignores, lint-disable) to lower the count without fixing the cause — that is experiment fraud.",
+    "Never weaken linter/compiler configuration to drop warnings.",
+    "Preserve runtime behavior — a type-only or formatting fix must not change what the code does."
+  ],
+  "onExhausted": "Stop. Report the baseline and best metric values, which edits were kept vs reverted, and whether the remaining issues in the target need a config decision or a larger refactor than one file allows."
+}

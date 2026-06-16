@@ -1,0 +1,22 @@
+{
+  "name": "ci-green",
+  "kind": "workflow",
+  "description": "Drive a PR's CI checks to green: diagnose each failure, push a fix, repeat until all checks pass.",
+  "maxIterations": 5,
+  "checks": [],
+  "rubric": [
+    "Every required CI check on the PR reports success (verified against the live PR, not assumed).",
+    "The PR is mergeable (no conflicts with the base branch).",
+    "No CI job, test, or check was disabled, skipped, or marked flaky to get there.",
+    "Each fix pushed this loop was reproduced and verified locally before pushing, where local reproduction was possible."
+  ],
+  "skills": [],
+  "instructions": [".github/instructions/04-IMPLEMENT.md"],
+  "fixPrompt": "Each iteration: (1) Fetch the PR's current check status and the logs of every failing job. (2) Reproduce the failure locally where possible using the matching command from the validation matrix in .github/harness/HARNESS.md. (3) Fix the root cause, run the local equivalent until green, commit and push to the PR branch. (4) Wait for CI to report (prefer event subscriptions over polling; never busy-wait with sleep). Converges when all required checks are green and the PR is mergeable.",
+  "guardrails": [
+    "Never disable, skip, or mark-flaky a CI job or test to converge — fix the cause.",
+    "A rebase/re-run without a code change counts as an iteration and is allowed at most once for suspected infrastructure flakes.",
+    "If a failure is real but out of scope for the PR, report it instead of fixing it in-loop."
+  ],
+  "onExhausted": "Stop. Report each still-failing check with its log excerpt, the fixes attempted per iteration, and whether the failure looks like PR code, pre-existing breakage, or CI infrastructure."
+}

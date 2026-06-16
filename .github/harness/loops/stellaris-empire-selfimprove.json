@@ -1,0 +1,21 @@
+{
+  "name": "stellaris-empire-selfimprove",
+  "kind": "experiment",
+  "description": "Iteratively improve empire build and action selection method; keep only score-improving edits.",
+  "maxIterations": 8,
+  "noImprovementStop": 3,
+  "target": [
+    "engine/decision_engine.py",
+    "engine/strategic_planner.py",
+    "engine/multi_agent.py",
+    "docs/meta/*.json"
+  ],
+  "metric": {
+    "name": "empire_method_score",
+    "run": "{{commands.methodScore}}",
+    "extract": "METHOD_SCORE=([0-9]+(?:\\.[0-9]+)?)",
+    "direction": "maximize"
+  },
+  "instructions": ["CLAUDE.md", "docs/PROJECT_OVERVIEW.md"],
+  "skills": []
+}

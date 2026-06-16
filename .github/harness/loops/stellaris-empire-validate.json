@@ -1,0 +1,12 @@
+{
+  "name": "stellaris-empire-validate",
+  "kind": "convergence",
+  "description": "Validate selfimprove candidates against action legality, fog-of-war safety, and regression checks.",
+  "maxIterations": 4,
+  "checks": [
+    { "name": "action policy", "run": "{{commands.actionPolicyEval}}", "timeoutMs": 900000 },
+    { "name": "fow safety", "run": "{{commands.fowSafetyEval}}", "timeoutMs": 900000 },
+    { "name": "empire build eval", "run": "{{commands.empireBuildEval}}", "timeoutMs": 1200000 },
+    { "name": "planner regressions", "run": "{{commands.methodRegression}}", "timeoutMs": 1200000 }
+  ]
+}

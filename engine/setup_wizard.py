@@ -166,8 +166,8 @@ def pull_ollama_model(
     base_url: str = "http://localhost:11434",
 ) -> bool:
     """Pull a model from Ollama's registry. Shows progress."""
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     url = f"{base_url.rstrip('/')}/api/pull"
     payload = json.dumps({"name": model, "stream": True}).encode()
@@ -310,7 +310,10 @@ def run_wizard() -> dict:
     if save_dir:
         config["save_dir"] = _ask("Save games path", str(save_dir))
     else:
-        config["save_dir"] = _ask("Save games path", str(Path(config["user_data_dir"]) / "save games"))
+        config["save_dir"] = _ask(
+            "Save games path",
+            str(Path(config["user_data_dir"]) / "save games"),
+        )
 
     config["bridge_dir"] = str(
         Path(config["user_data_dir"]) / "mod/stellaris_overmind/ai_bridge"
@@ -337,8 +340,16 @@ def run_wizard() -> dict:
         provider_options.append("lm-studio — LM Studio (local, parallel requests)")
         if not ollama_ok:
             default_provider = "lm-studio — LM Studio (local, parallel requests)"
-    provider_options.append("ollama — Local or network Ollama (recommended)" if "ollama" not in str(provider_options) else "")
-    provider_options.append("lm-studio — LM Studio (local, parallel requests)" if "lm-studio" not in str(provider_options) else "")
+    provider_options.append(
+        "ollama — Local or network Ollama (recommended)"
+        if "ollama" not in str(provider_options)
+        else ""
+    )
+    provider_options.append(
+        "lm-studio — LM Studio (local, parallel requests)"
+        if "lm-studio" not in str(provider_options)
+        else ""
+    )
     provider_options = [p for p in provider_options if p]  # remove empty
     provider_options.extend([
         "openai-compat — Any OpenAI-compatible API (vLLM, cloud, etc.)",
@@ -354,7 +365,10 @@ def run_wizard() -> dict:
     if provider.startswith("ollama"):
         config["provider"] = "ollama"
         default_url = "http://localhost:11434"
-        url = _ask("Ollama URL (local, network, or remote — e.g. http://192.168.1.50:11434)", default_url)
+        url = _ask(
+            "Ollama URL (local, network, or remote — e.g. http://192.168.1.50:11434)",
+            default_url,
+        )
         config["base_url"] = url.rstrip("/")
 
         # Always probe the entered URL (may differ from auto-detect)
@@ -403,7 +417,10 @@ def run_wizard() -> dict:
     elif provider.startswith("lm-studio"):
         config["provider"] = "lm-studio"
         default_url = "http://localhost:1234"
-        url = _ask("LM Studio URL (local, network, or remote — e.g. http://192.168.1.50:1234)", default_url)
+        url = _ask(
+            "LM Studio URL (local, network, or remote — e.g. http://192.168.1.50:1234)",
+            default_url,
+        )
         config["base_url"] = url.rstrip("/")
 
         # Always probe the entered URL
@@ -512,7 +529,10 @@ def run_wizard() -> dict:
     else:
         config["planner_model"] = ""
 
-    config["fast_decisions"] = _ask_bool("Enable fast decisions (skip LLM for trivial cases)?", default=True)
+    config["fast_decisions"] = _ask_bool(
+        "Enable fast decisions (skip LLM for trivial cases)?",
+        default=True,
+    )
     config["fast_cutoff_year"] = int(_ask("Fast decision cutoff year", "2250"))
 
     # --- 5. Recording ---
@@ -570,7 +590,7 @@ def install_mod(user_data_dir: str) -> bool:
             if sys.platform == "win32":
                 # Use junction (doesn't require admin on most Windows configs)
                 import subprocess
-                result = subprocess.run(
+                subprocess.run(
                     ["cmd", "/c", "mklink", "/J", str(mod_target), str(mod_source)],
                     capture_output=True, text=True,
                 )
